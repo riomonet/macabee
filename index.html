@@ -1,215 +1,284 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <style>
-        .generic-slot {
-            position: absolute;
-            font-family: monospace;
-            font-size: 16px;
-            border: none;
-            background: transparent;
-            padding: 0;
-            margin: 0;
-            height: 1em;
-            
-            /* Drive coordinates using typography-grid registers */
-            top: calc(var(--row) * 1em);
-            left: calc(var(--col) * 1ch);
-            width: calc(var(--len) * 1ch);
-        }
+    <head>
+        <style>
 
-
-        /* Rigid input tracking frame */
-        .generic-slot:not([readonly]) {
-            border-bottom: 1px solid black;
-        }
-    </style>
-</head>
-<body>
-    <div id="terminal"></div>
-    <script>
-     
-     const MAX_SLOTS = 100;
-     const SLOT_POOL = new Array(MAX_SLOTS);
-     const terminal = document.getElementById('terminal');
-     const url = "http://0.0.0.0:8000"
-
-     for (let i = 0; i < MAX_SLOTS; i++) {
-	 const input = document.createElement('input');
-	 input.className = 'generic-slot';
-	 input.style.display = 'none'; // Keep it dark until bytes arrive
-	 input.disabled= true;
-	 input.tabIndex = -1;
-	 input.slotId = i;
-	 input.isDirty = false;
-	 terminal.appendChild(input);
-	 SLOT_POOL[i] = input;
-     }
-     sys_net_init(url)
-
-     /* 
-      *      ┌───────────────────────────────────────────────────────────────────────────┐
-      *      │                           COPYBOOK LAYOUT                                 │
-      *      ├──────────────┬────────────────────────────────────────────────────────────┤
-      *      │ Header       │ [ dirtyCount (1 byte) ]                                    │
-      *      ├──────────────┼────────────────────────────────────────────────────────────┤
-      *      │ Field 1 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
-      *      ├──────────────┼────────────────────────────────────────────────────────────┤
-      *      │ Field 2 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
-      *      └──────────────┴────────────────────────────────────────────────────────────┘ */
-     
-     function send_changed_inputs_only(aid_key) {
-	 // TODO add a byte for which aid key was pressed
-	 let dirtyCount = 0;
-	 let payloadSize = 1;
-
-	 const slotIndex = 1;
-	 const strLength = 1;
-
-
-	 for (let i = 0; i < MAX_SLOTS; i++) {
-	     if (SLOT_POOL[i].isDirty) {
-		 dirtyCount += 1;
-		 payloadSize += slotIndex + strLength + SLOT_POOL[i].value.length;
-	     }
-	 }
-	 
-	 let buffer = new ArrayBuffer(payloadSize); // Raw unformated Memory Allocation
-	 let destBytes = new Uint8Array(buffer);
-	 let position = 0;
-
-	 destBytes[position++] = dirtyCount;
-	 
-	 for (let i = 0; i < MAX_SLOTS; i++) {
-	     if (SLOT_POOL[i].isDirty) {
-		 const idx = i;
-		 const len = SLOT_POOL[i].value.length;
-		 destBytes[position += slotIndex] = idx;
-		 destBytes[position += strLen] = len;
-
-		 let strBytes = encoder.encode(SLOT_POOL[i].value);
-		 destBytes.set(strBytes, position);
-		 position += length;
-		 SLOT_POOL[i].isDirty = false;
-	     }
-	 }
-	 socket.send(buffer);
-     }
-
-     function add_key_event_listeners(key, event, callback) {
-	 terminal.addEventListener(event, function(e) {
-             if (e.key === key) {
-		 e.preventDefault();
-		 callback(key);
-             }
-	 });
-     }
-     
-     function add_AID_keys() {
-	 add_key_event_listeners('Enter', 'keydown',send_changed_inputs_only);
-     }
-
-     function set_dirty() {
-	 this.isDirty = true;
-     }
-
-     function sys_render_terminal(fieldCount, arrayBuffer) {
-         const view = new DataView(arrayBuffer);
-         let dataOffset = fieldCount * 4; 
-	 const decoder = new TextDecoder('utf-8');
-
-	 
-         for (let i = 0; i < fieldCount; i++) {
-             const handle = SLOT_POOL[i];
-             const mapOffset = i * 4;
-
-             const row  = view.getUint8(mapOffset + 0);
-             const col  = view.getUint8(mapOffset + 1);
-             const len  = view.getUint8(mapOffset + 2);
-             const attr = view.getUint8(mapOffset + 3);
-
-	     handle.style.display = 'block';
-	     handle.disabled = false;
-             handle.style.setProperty('--row', row);
-             handle.style.setProperty('--col', col);
-             handle.style.setProperty('--len', len);
-             handle.maxLength = len;
-
-	     /* TextDecoder API */
-
-             if (attr === 1) {
-                 handle.readOnly = true;
-                 handle.classList.add('label');
-		 const textBytes = new Uint8Array(arrayBuffer, dataOffset, len);
-		 handle.value = decoder.decode(textBytes);
-		 dataOffset += len;
-             } else {
-                 handle.readOnly = false;
-		 handle.tabIndex = 0;
-		 handle.oninput = set_dirty;
-             }
+         .generic-slot:focus {
+             outline: none;
+             box-shadow: none;
          }
-     }
-     // [Future use opcode 1byte for diff msg types] [ Field Count (1 byte) ] [ Headers Block (fieldCount * 4 bytes) ] [ Text Payload Block (Variable length) ]
-     function sys_net_init(url) {
-	 const socket = new WebSocket(url);
-	 socket.binaryType = "arraybuffer";  
+         
+         .generic-slot {
+             position: absolute;
+             font-family: monospace;
+             font-size: 16px;
+             border: none;
+             background: transparent;
+             padding: 0;
+             margin: 0;
+             height: 1em;
+             
+             /* Drive coordinates using typography-grid registers */
+             top: calc(var(--row) * 1em);
+             left: calc(var(--col) * 1ch);
+             width: calc(var(--len) * 1ch);
+         }
 
-	 // Triggered instantly whenever a new network packet arrives
-	 socket.onmessage = function(event) {
-             const packetBuffer = event.data;
-	     const view = new DataView(packetBuffer);
-	     // [opcode 1][opcode 1][fieldCount 1][headers fieldcoutn *4][data variable]
-	     const fieldCount = view.getUint8(0); 
-	     const payloadBuffer = packetBuffer.slice(1);
-             sys_render_terminal(fieldcount, packetBuffer);
-	     add_AID_keys();
-	 };
 
-	 socket.onopen = ()  =>
-	     {
-		 console.log  ("Network pipeline connected to C backend.");
-		 socket.send(Uint8Array.of(0xFF));
-	     }
-	 socket.onerror = (err) => console.error("Network socket error:", err);
-	 socket.onclose = ()    => console.log  ("Network pipeline disconnected.");
+         /* Rigid input tracking frame */
+         .generic-slot:not([readonly]) {
+             border-bottom: 1px solid black;
+         }
+        </style>
+    </head>
+    <body>
+        <div id="terminal"></div>
+        <script>
+         
+         const MAX_SLOTS = 100;
+         const SLOT_POOL = new Array(MAX_SLOTS);
+         const terminal = document.getElementById('terminal');
+         const url = "ws://localhost:8001/ws"
+         
 
-	 return socket;
-     }
-     // [ Master Opcode (1B) ] [ AID Key (1B) ] [ Dirty Count (1B) ] [ Field 0 Index (1B) ] [ Field 0 Len (1B) ] [ Field 0 String (Variable) ] 
-    </script>
-</body>
+         
+         for (let i = 0; i < MAX_SLOTS; i++) {
+	         const input = document.createElement('input');
+	         input.className = 'generic-slot';
+	         input.style.display = 'none'; // Keep it dark until bytes arrive
+	         input.disabled= true;
+	         input.tabIndex = -1;
+	         input.slotId = i;
+	         input.isDirty = false;
+             input.autocomplete = 'off';
+             input.spellcheck = false;
+             input.autocorrect = 'off';
+             input.autocapitalize = 'off';
+	         terminal.appendChild(input);
+	         SLOT_POOL[i] = input;
+         }
+         
+         sys_net_init(url);
+         disableTabDefaults();
+         add_AID_keys();
+
+
+         /* Manually manage active focus change on tab key andhsift tab */
+         function  disableTabDefaults() {
+             terminal.addEventListener('keydown', function(e) {
+                 if (e.key !== 'Tab') return;
+
+                 e.preventDefault();
+
+                 const focusable = SLOT_POOL.filter(slot =>
+                     slot.style.display !== 'none' && !slot.readOnly && !slot.disabled );
+
+                 if (focusable.length === 0) return;
+
+                 const current = document.activeElement;
+
+                 let idx = focusable.indexOf(current);
+
+                 if (e.shiftKey) {
+                     idx--;
+                     if (idx < 0)
+                         idx = focusable.length - 1;
+                 } else {
+                     idx++;
+                     if (idx >= focusable.length)
+                         idx = 0;
+                 }
+                 focusable[idx].focus();
+             });
+         }
+
+
+         function send_changed_inputs_only(aid_key) {
+	         // TODO add a byte for which aid key was pressed
+	         let dirtyCount = 0;
+	         let payloadSize = 1;
+
+	         const slotIndex = 1;
+	         const strLength = 1;
+
+
+	         for (let i = 0; i < MAX_SLOTS; i++) {
+	             if (SLOT_POOL[i].isDirty) {
+		             dirtyCount += 1;
+		             payloadSize += slotIndex + strLength + SLOT_POOL[i].value.length;
+	             }
+	         }
+	         
+	         let buffer = new ArrayBuffer(payloadSize); // Raw unformated Memory Allocation
+	         let destBytes = new Uint8Array(buffer);
+	         let position = 0;
+
+	         destBytes[position++] = dirtyCount;
+
+
+	         for (let i = 0; i < MAX_SLOTS; i++) {
+	             if (SLOT_POOL[i].isDirty) {
+		             const idx = i;
+		             const len = SLOT_POOL[i].value.length;
+		             destBytes[position += slotIndex] = idx;
+		             destBytes[position += strLen] = len;
+
+		             let strBytes = encoder.encode(SLOT_POOL[i].value);
+		             destBytes.set(strBytes, position);
+		             position += length;
+		             SLOT_POOL[i].isDirty = false;
+	             }
+	         }
+	         socket.send(buffer);
+         }
+
+         function add_key_event_listeners(key, event, callback) {
+	         terminal.addEventListener(event, function(e) {
+                 if (e.key === key) {
+		             e.preventDefault();
+		             callback(key);
+                 }
+	         });
+         }
+
+         function add_AID_keys() {
+
+	         add_key_event_listeners('Enter', 'keydown',send_changed_inputs_only);
+         }
+
+         function set_dirty() {
+	         this.isDirty = true;
+         }
+
+         function sys_render_terminal(arrayBuffer) {
+             
+             const view             = new DataView(arrayBuffer);
+	         const decoder          = new TextDecoder('utf-8');
+             const headerSize       = 8;
+             const opcodeA          = view.getUint8(0);
+             const opcodeB          = view.getUint8(1);
+             const fieldCount       = view.getUint8(2);
+             const reserved         = view.getUint8(3);
+             const layoutBytesSz    = view.getUint16(4,true);
+             const stateBytesSz     = view.getUint16(6,true);
+             const layoutBase       = headerSize;
+             const stateBase        = layoutBase + layoutBytesSz;
+
+             const layout_struct    = 8;
+             const state_struct     = 48;
+
+
+             for (let i             = 0; i < fieldCount; i++) {
+                 const handle       = SLOT_POOL[i];
+                 const layoutOffset = layoutBase + (i * layout_struct);
+                 const stateOffset  = stateBase + (i * state_struct);
+
+                 // Layout
+                 const layoutId  = view.getUint8(layoutOffset + 0);
+                 const type      = view.getUint8(layoutOffset + 1);
+                 const col       = view.getUint8(layoutOffset + 2);
+                 const row       = view.getUint8(layoutOffset + 3);
+                 const fldWidth  = view.getUint8(layoutOffset + 4);
+                 const layout_r1 = view.getUint8(layoutOffset + 5);
+                 const layout_r2 = view.getUint8(layoutOffset + 6);
+                 const layout_r3 = view.getUint8(layoutOffset + 7);
+
+
+                 // State
+                 const stateId   = view.getUint8(stateOffset + 0);
+                 const flags     = view.getUint8(stateOffset + 1);
+                 const fgColor   = view.getUint8(stateOffset + 2);
+                 const bgColor   = view.getUint8(stateOffset + 3);
+                 const textLen   = view.getUint8(stateOffset + 4);
+                 const stateR1   = view.getUint8(stateOffset + 5);
+                 const stateR2   = view.getUint8(stateOffset + 6);
+                 const stateR3   = view.getUint8(stateOffset + 7);
+                 const textBytes =
+                     new Uint8Array(arrayBuffer, stateOffset + 8, textLen);
+		         handle.value = decoder.decode(textBytes);
+
+	             handle.style.display = 'block';
+	             handle.disabled = false;
+                 handle.style.setProperty('--row', row);
+                 handle.style.setProperty('--col', col);
+                 handle.style.setProperty('--len', fldWidth);
+                 handle.maxLength = fldWidth;
+
+                 if (type === 1) {
+                     handle.readOnly = true;
+                     handle.classList.add('label');
+                 } else {
+                     handle.readOnly = false;
+		             handle.tabIndex = 0;
+		             handle.oninput = set_dirty;
+                 }
+             }
+             SLOT_POOL[2].focus();
+         }
+
+         function sys_net_init(url) {
+	         const socket = new WebSocket(url);
+	         socket.binaryType = "arraybuffer";  
+	         socket.onmessage = function(event) {
+                 sys_render_terminal(event.data);
+	         };
+
+	         socket.onopen = ()  =>
+	             {
+		             console.log  ("Network pipeline connected to C backend.");
+		             socket.send(Uint8Array.of(0xFF));
+	             }
+             
+	         socket.onerror = (err) => console.error("Network socket error:", err);
+	         socket.onclose = ()    => console.log  ("Network pipeline disconnected.");
+	         return socket;
+         }
+        </script>
+    </body>
 </html>
 
+<!-- <-- -->
+<!--     function sys_on_packet_received(arrayBuffer) { -->
+<!--         const view = new DataView(arrayBuffer); -->
+
+<!--         // Read the very first byte to determine the type of payload -->
+<!--         const msgType = view.getUint8(0);  -->
+
+<!--         switch (msgType) { -->
+<!--         case 1: // Terminal Screen Data -->
+<!--             sys_render_terminal(arrayBuffer); -->
+<!--             break; -->
+
+<!--         case 2: // Media Asset Data -->
+<!--             sys_process_media(arrayBuffer); -->
+<!--             break; -->
+
+<!--         default: -->
+<!--             console.error("Unknown message type identifier:", msgType); -->
+<!--         } -->
+<!--     } -->
 
 
-<!-- MULTIPLE MEDIA TYPES --> 
-<!-- first bytes specifies type.
-     function sys_on_packet_received(arrayBuffer) {
-     const view = new DataView(arrayBuffer);
+<!-- Enter	0x7D	Commit block mutations -->
+<!-- F1	0xF1	Request Help / Custom action -->
+<!-- F2	0xF2	Custom action -->
+<!-- F3	0xF3	Exit / Back -->
+<!-- ...	...	... -->
+<!--     F12	0xFC	Custom action -->
+<!-- -\-> -->
 
-     // Read the very first byte to determine the type of payload
-     const msgType = view.getUint8(0); 
 
-     switch (msgType) {
-     case 1: // Terminal Screen Data
-     sys_render_terminal(arrayBuffer);
-     break;
-
-     case 2: // Media Asset Data
-     sys_process_media(arrayBuffer);
-     break;
-
-     default:
-     console.error("Unknown message type identifier:", msgType);
-     }
-     } -->
 
 <!-- 
-     Enter	0x7D	Commit block mutations
-     F1	0xF1	Request Help / Custom action
-     F2	0xF2	Custom action
-     F3	0xF3	Exit / Back
-     ...	...	...
-     F12	0xFC	Custom action
+     /* 
+     *      ┌───────────────────────────────────────────────────────────────────────────┐
+     *      │                           COPYBOOK LAYOUT                                 │
+     *      ├──────────────┬────────────────────────────────────────────────────────────┤
+     *      │ Header       │ [ dirtyCount (1 byte) ]                                    │
+     *      ├──────────────┼────────────────────────────────────────────────────────────┤
+     *      │ Field 1 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
+     *      ├──────────────┼────────────────────────────────────────────────────────────┤
+     *      │ Field 2 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
+     *      └──────────────┴────────────────────────────────────────────────────────────┘
+     */
 -->
