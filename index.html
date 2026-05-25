@@ -34,16 +34,40 @@
     <body>
         <div id="terminal"></div>
         <script>
+
          
          const MAX_SLOTS = 100;
+         const INPUTS  = [];
          const SLOT_POOL = new Array(MAX_SLOTS);
          const terminal = document.getElementById('terminal');
          const url = "ws://localhost:8001/ws"
-         
 
          
          for (let i = 0; i < MAX_SLOTS; i++) {
 	         const input = document.createElement('input');
+
+             input.layout = {
+                 id: 0,
+                 typ: 0,
+                 col: 0,
+                 row: 0,
+                 width: 0,
+                 r1: 0,
+                 r2: 0,
+                 r3: 0
+             };
+
+              input.state = {
+                  id: 0,
+                  flags: 0,
+                  fgColor: 0,
+                  bgColor: 0,
+                  len: 0,
+                  r1: 0,
+                  r2: 0,
+                  r3: 0
+              };
+
 	         input.className = 'generic-slot';
 	         input.style.display = 'none'; // Keep it dark until bytes arrive
 	         input.disabled= true;
@@ -58,11 +82,28 @@
 	         SLOT_POOL[i] = input;
          }
          
-         sys_net_init(url);
+         const socket = sys_net_init(url);
          disableTabDefaults();
          add_AID_keys();
 
 
+
+         const AID_KEYS = Object.freeze ({
+             'Enter': 0x7D,
+             'F1':    0xF1,
+             'F2':    0xF2,
+             'F3':    0xF3,
+             'F4':    0xF4,
+             'F5':    0xF5,
+             'F6':    0xF6,
+             'F7':    0xF7,
+             'F8':    0xF8,
+             'F9':    0xF9,
+             'F10':   0x7A,
+             'F11':   0x7B,
+             'F12':   0x7C,
+         });
+         
          /* Manually manage active focus change on tab key andhsift tab */
          function  disableTabDefaults() {
              terminal.addEventListener('keydown', function(e) {
@@ -70,68 +111,64 @@
 
                  e.preventDefault();
 
-                 const focusable = SLOT_POOL.filter(slot =>
-                     slot.style.display !== 'none' && !slot.readOnly && !slot.disabled );
 
-                 if (focusable.length === 0) return;
+                 if (INPUTS.length === 0) return;
 
                  const current = document.activeElement;
 
-                 let idx = focusable.indexOf(current);
+                 let idx = INPUTS.indexOf(current);
 
                  if (e.shiftKey) {
                      idx--;
                      if (idx < 0)
-                         idx = focusable.length - 1;
+                         idx = INPUTS.length - 1;
                  } else {
                      idx++;
-                     if (idx >= focusable.length)
+                     if (idx >= INPUTS.length)
                          idx = 0;
                  }
-                 focusable[idx].focus();
+                 INPUTS[idx].focus();
              });
          }
 
+         /* Header */
+         /* |AID Key 1b| nFields | */
+         /* Field blocks */
+         /* |field_id 1b| field_len 1b| field_val | */
+         function send_changed_inputs_only(key) {
+          
+             const MDT = [];
+             let bytes = 0;
+             const encoder = new TextEncoder();
+             const AID = AID_KEYS[key];
+             
+             bytes++; /* AIDkey 1b*/
+             bytes++; /* nFields 1b*/
+             for (let i = 0; i < INPUTS.length; i++) {
+                 if (INPUTS[i].isDirty) {
+                     MDT.push(INPUTS[i]);
+                     bytes++; /* field_id 1b*/
+                     bytes++; /* field_len 1b*/
 
-         function send_changed_inputs_only(aid_key) {
-	         // TODO add a byte for which aid key was pressed
-	         let dirtyCount = 0;
-	         let payloadSize = 1;
-
-	         const slotIndex = 1;
-	         const strLength = 1;
-
-
-	         for (let i = 0; i < MAX_SLOTS; i++) {
-	             if (SLOT_POOL[i].isDirty) {
-		             dirtyCount += 1;
-		             payloadSize += slotIndex + strLength + SLOT_POOL[i].value.length;
-	             }
-	         }
-	         
-	         let buffer = new ArrayBuffer(payloadSize); // Raw unformated Memory Allocation
-	         let destBytes = new Uint8Array(buffer);
-	         let position = 0;
-
-	         destBytes[position++] = dirtyCount;
-
-
-	         for (let i = 0; i < MAX_SLOTS; i++) {
-	             if (SLOT_POOL[i].isDirty) {
-		             const idx = i;
-		             const len = SLOT_POOL[i].value.length;
-		             destBytes[position += slotIndex] = idx;
-		             destBytes[position += strLen] = len;
-
-		             let strBytes = encoder.encode(SLOT_POOL[i].value);
-		             destBytes.set(strBytes, position);
-		             position += length;
-		             SLOT_POOL[i].isDirty = false;
-	             }
-	         }
-	         socket.send(buffer);
+                     bytes += INPUTS[i].value.length;
+                 }
+             }
+             const buffer = new ArrayBuffer(bytes);
+             const copybook = new Uint8Array(buffer);
+             let pos = 0;
+             copybook[pos++] =AID; //aidkey resolve
+             copybook[pos++] = MDT.length;
+             for(let i = 0; i <  MDT.length; i++) {
+                 copybook[pos++] = MDT[i].state.id;
+                 copybook[pos++] = MDT[i].value.length;
+                 const text = encoder.encode(MDT[i].value);
+                 copybook.set(text,pos);
+                 pos += text.length;
+             }
+             console.log(socket);
+             socket.send(buffer);
          }
-
+         
          function add_key_event_listeners(key, event, callback) {
 	         terminal.addEventListener(event, function(e) {
                  if (e.key === key) {
@@ -142,7 +179,6 @@
          }
 
          function add_AID_keys() {
-
 	         add_key_event_listeners('Enter', 'keydown',send_changed_inputs_only);
          }
 
@@ -166,7 +202,7 @@
 
              const layout_struct    = 8;
              const state_struct     = 48;
-
+             const IC               = -1; /* Initial cursor flag */
 
              for (let i             = 0; i < fieldCount; i++) {
                  const handle       = SLOT_POOL[i];
@@ -175,10 +211,10 @@
 
                  // Layout
                  const layoutId  = view.getUint8(layoutOffset + 0);
-                 const type      = view.getUint8(layoutOffset + 1);
+                 const typ       = view.getUint8(layoutOffset + 1);
                  const col       = view.getUint8(layoutOffset + 2);
                  const row       = view.getUint8(layoutOffset + 3);
-                 const fldWidth  = view.getUint8(layoutOffset + 4);
+                 const width     = view.getUint8(layoutOffset + 4);
                  const layout_r1 = view.getUint8(layoutOffset + 5);
                  const layout_r2 = view.getUint8(layoutOffset + 6);
                  const layout_r3 = view.getUint8(layoutOffset + 7);
@@ -193,26 +229,39 @@
                  const stateR1   = view.getUint8(stateOffset + 5);
                  const stateR2   = view.getUint8(stateOffset + 6);
                  const stateR3   = view.getUint8(stateOffset + 7);
-                 const textBytes =
-                     new Uint8Array(arrayBuffer, stateOffset + 8, textLen);
-		         handle.value = decoder.decode(textBytes);
+                 const textBytes = new Uint8Array(arrayBuffer, stateOffset + 8, textLen);
 
+                 handle.layout.id = layoutId;
+                 handle.layout.typ = typ;
+                 handle.layout.col = col;
+                 handle.layout.row = row;
+                 handle.layout.width = width;
+                 
+                 handle.state.id = stateId;
+                 handle.state.flags = flags
+                 handle.state.fgColor = fgColor;
+                 handle.state.bgColor = bgColor;
+                 handle.state.len = textLen
+
+		         handle.value = decoder.decode(textBytes);                 
 	             handle.style.display = 'block';
 	             handle.disabled = false;
-                 handle.style.setProperty('--row', row);
-                 handle.style.setProperty('--col', col);
-                 handle.style.setProperty('--len', fldWidth);
-                 handle.maxLength = fldWidth;
+                 handle.style.setProperty('--row', handle.layout.row);
+                 handle.style.setProperty('--col', handle.layout.col);
+                 handle.style.setProperty('--len', handle.layout.width);
+                 handle.maxLength = handle.layout.width;
 
-                 if (type === 1) {
+                 if (handle.layout.typ === 1) {
                      handle.readOnly = true;
                      handle.classList.add('label');
                  } else {
                      handle.readOnly = false;
 		             handle.tabIndex = 0;
 		             handle.oninput = set_dirty;
+                     INPUTS.push(handle);
                  }
              }
+             /* TODO: this should be encoded in flags */
              SLOT_POOL[2].focus();
          }
 
@@ -268,17 +317,10 @@
 <!-- -\-> -->
 
 
+<!-- IBM terminology:
 
-<!-- 
-     /* 
-     *      ┌───────────────────────────────────────────────────────────────────────────┐
-     *      │                           COPYBOOK LAYOUT                                 │
-     *      ├──────────────┬────────────────────────────────────────────────────────────┤
-     *      │ Header       │ [ dirtyCount (1 byte) ]                                    │
-     *      ├──────────────┼────────────────────────────────────────────────────────────┤
-     *      │ Field 1 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
-     *      ├──────────────┼────────────────────────────────────────────────────────────┤
-     *      │ Field 2 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
-     *      └──────────────┴────────────────────────────────────────────────────────────┘
-     */
--->
+     MDT → Modified Data Tag
+     IC → Initial Cursor
+     PROT → Protected
+     NUM → Numeric-only
+     AID → Attention Identifier (Enter/PF keys -->
