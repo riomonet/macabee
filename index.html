@@ -86,7 +86,10 @@
          disableTabDefaults();
          add_AID_keys();
 
-
+         const cbOpcode = Object.freeze({
+             
+         });
+         
 
          const AID_KEYS = Object.freeze ({
              'Enter': 0x7D,
@@ -103,25 +106,34 @@
              'F11':   0x7B,
              'F12':   0x7C,
          });
-         
+
+         const OPCODE_A = Object.freeze ({
+             NEW:    0x01,
+             UPDATE: 0x02
+         });
+
+
+         function globalReset() {
+             INPUTS.length = 0;
+             for (let i = 0; i < MAX_SLOTS; i++) {
+                 SLOT_POOL[i].isDirty = false;
+             }
+         }
+                          
          /* Manually manage active focus change on tab key andhsift tab */
          function  disableTabDefaults() {
              terminal.addEventListener('keydown', function(e) {
                  if (e.key !== 'Tab') return;
-
                  e.preventDefault();
-
-
                  if (INPUTS.length === 0) return;
-
+                 
                  const current = document.activeElement;
-
                  let idx = INPUTS.indexOf(current);
-
                  if (e.shiftKey) {
                      idx--;
-                     if (idx < 0)
+                     if (idx < 0) {
                          idx = INPUTS.length - 1;
+                     }
                  } else {
                      idx++;
                      if (idx >= INPUTS.length)
@@ -136,12 +148,10 @@
          /* Field blocks */
          /* |field_id 1b| field_len 1b| field_val | */
          function send_changed_inputs_only(key) {
-          
              const MDT = [];
              let bytes = 0;
              const encoder = new TextEncoder();
              const AID = AID_KEYS[key];
-             
              bytes++; /* AIDkey 1b*/
              bytes++; /* nFields 1b*/
              for (let i = 0; i < INPUTS.length; i++) {
@@ -156,7 +166,7 @@
              const buffer = new ArrayBuffer(bytes);
              const copybook = new Uint8Array(buffer);
              let pos = 0;
-             copybook[pos++] =AID; //aidkey resolve
+             copybook[pos++] = AID; //aidkey resolve
              copybook[pos++] = MDT.length;
              for(let i = 0; i <  MDT.length; i++) {
                  copybook[pos++] = MDT[i].state.id;
@@ -165,7 +175,6 @@
                  copybook.set(text,pos);
                  pos += text.length;
              }
-             console.log(socket);
              socket.send(buffer);
          }
          
@@ -186,12 +195,13 @@
 	         this.isDirty = true;
          }
 
-         function sys_render_terminal(arrayBuffer) {
+         function sys_update_terminal(view) {
              
-             const view             = new DataView(arrayBuffer);
+         }
+
+         function sys_render_terminal(view) {
 	         const decoder          = new TextDecoder('utf-8');
              const headerSize       = 8;
-             const opcodeA          = view.getUint8(0);
              const opcodeB          = view.getUint8(1);
              const fieldCount       = view.getUint8(2);
              const reserved         = view.getUint8(3);
@@ -219,7 +229,6 @@
                  const layout_r2 = view.getUint8(layoutOffset + 6);
                  const layout_r3 = view.getUint8(layoutOffset + 7);
 
-
                  // State
                  const stateId   = view.getUint8(stateOffset + 0);
                  const flags     = view.getUint8(stateOffset + 1);
@@ -229,7 +238,7 @@
                  const stateR1   = view.getUint8(stateOffset + 5);
                  const stateR2   = view.getUint8(stateOffset + 6);
                  const stateR3   = view.getUint8(stateOffset + 7);
-                 const textBytes = new Uint8Array(arrayBuffer, stateOffset + 8, textLen);
+                 const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
 
                  handle.layout.id = layoutId;
                  handle.layout.typ = typ;
@@ -269,13 +278,22 @@
 	         const socket = new WebSocket(url);
 	         socket.binaryType = "arraybuffer";  
 	         socket.onmessage = function(event) {
-                 sys_render_terminal(event.data);
+                 if(event.data.byteLength > 0) {
+                     const view = new DataView(event.data);
+                     const opcodeA = view.getUint8(0);
+                     if(opcodeA === OPCODE_A.NEW) {
+                         globalReset();
+                         sys_render_terminal(view);
+                     } else {
+                         sys_update_terminal(view);
+                     }
+                 } 
 	         };
 
 	         socket.onopen = ()  =>
 	             {
 		             console.log  ("Network pipeline connected to C backend.");
-		             socket.send(Uint8Array.of(0xFF));
+		             socket.send(Uint8Array.of(0x88));
 	             }
              
 	         socket.onerror = (err) => console.error("Network socket error:", err);

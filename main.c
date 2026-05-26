@@ -52,6 +52,23 @@ struct __attribute__((packed)) field_state {
     char text[MAX_FLD_SIZE];
 };
 
+enum where_you_at {
+    LOGIN, MAIN
+};
+
+enum permissions {
+    ADMIN, CUSTOMER
+};
+
+struct who_is_where {
+    u64 conn_id;
+    enum where_you_at wya;
+    enum permissions p;
+    UT_hash_handle hh;
+};
+
+struct who_is_where *users = NULL;
+
 
 void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
 
@@ -76,7 +93,7 @@ void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
     
     u8 *pos = respbuf;
 
-    struct packet_header h = { .opcode_a = 0,
+    struct packet_header h = { .opcode_a = 0x01,
                                .opcode_b = 0,
                                .num_fields = 6,
                                .reserved = 0,
@@ -97,23 +114,50 @@ void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
 }
 
 /* ---------------------------- state management ------------------------------------------------------------------- */
-void parse_incoming_bs_from_client_and_render_something(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
-    make_me_a_login_screen(respbuf, respbufsz);
+int verify_login_credentials(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
+    // extract user  
+    // extract pw 
+    // verify user and pw
+    // retunr ok, bad_user, bad_pass. 
+
+    printf("BITCHES");
+    return 1;
 }
 
 /* respbuf is created in mongoose portion, that we fill in to
  send back out over the wire.*/
-void big_fucking_business(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
-	parse_incoming_bs_from_client_and_render_something(reqbuf, reqbuflen, respbuf, respbufsz);
+void big_fucking_business(u64 conn_id, u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
+    struct who_is_where *wiw = NULL;
+    HASH_FIND_INT(users,&conn_id,wiw);
+    if (!wiw) {
+        struct who_is_where *wiw = malloc(sizeof(*wiw));
+        wiw->conn_id = conn_id;
+        wiw->wya = LOGIN;
+        HASH_ADD_INT(users, conn_id, wiw);
+        make_me_a_login_screen(respbuf, respbufsz);
+    } else {
+        switch(wiw->wya) {
+        case LOGIN:
+            printf("LOGIN");
+            wiw->wya = MAIN;
+            // int res = verify_login_credentials(reqbuf, reqbuflen);
+            break;
+
+        case MAIN:
+            printf("MAIN");
+            break;
+        } 
+    }
 }
 
 /* ===========================================================================
        The MONGOOSE SHIT HERE, someone clean it up.
    =========================================================================== */
+
 void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     switch (ev) {
     case MG_EV_HTTP_MSG:
-        {
+        {  
             struct mg_http_message *hm = (struct mg_http_message *) ev_data;
             if ( mg_match (hm->uri, mg_str("/"), NULL)) {
                 struct mg_http_serve_opts opts = {.root_dir = ".", .fs = &mg_fs_posix};
@@ -126,12 +170,11 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         {
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
-                size_t respbufsz = 0;
-                u8 respbuf[4096] = {0};
-		
-                big_fucking_business((u8*)wm->data.buf, wm->data.len,
-                                     respbuf, &respbufsz);
-                mg_ws_send(c, respbuf, respbufsz, WEBSOCKET_OP_BINARY);
+              size_t respbufsz = 0;
+              u8 respbuf[4096] = {0};
+              big_fucking_business(c->id, (u8*)wm->data.buf, wm->data.len,
+                                   respbuf, &respbufsz);
+              mg_ws_send(c, respbuf, respbufsz, WEBSOCKET_OP_BINARY);
             }
         }
     }
@@ -171,8 +214,7 @@ int main(void) {
 /* shared access/update patterns */
 
 /*-----------------------------------------------------------  Server => Client Message Package ---------------------------------
-    
-  | opcode A 8bits | opcode B 8bits | Number of headers 1byte| headers (number of headers * sz of header) | payload data 1 item per header variable len |
+    | opcode A 8bits | opcode B 8bits | Number of headers 1byte| headers (number of headers * sz of header)| payload data  item per header variable len |
 
   ------------------------------------------------------------------------------------------------------------------------------ */
 /*
