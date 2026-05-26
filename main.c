@@ -13,8 +13,9 @@
 ===============================================================================*/
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
-#define VIS_INPUT 0
-#define VIS_LABEL 1
+#define VIS_INPUT 1 << 0
+#define VIS_LABEL 1 << 1
+#define VIS_LINE  1 << 2
 #define MAX_FLD_SIZE 40
 
 
@@ -69,6 +70,32 @@ struct who_is_where {
 
 struct who_is_where *users = NULL;
 
+enum colors {
+    BLACK,
+    RED,
+    GREEN,
+    BROWN,
+    BLUE,
+    MAGENTA,
+    CYAN,
+    WHITE,
+    AMBER
+};
+
+enum DSP {
+    BOLD      = 1 << 0,
+    FAINT     = 1 << 1,
+    INVERSE   = 1 << 2,
+    BLINK     = 1 << 3,
+    UNDERLINE = 1 << 4,
+    HIDDEN    = 1 << 5,
+    H_LINE    = 1 << 6,
+    PASSWORD  = 1 << 7
+};
+
+void login_failed_fuck_off_jk_try_again(u8 *respbuf, size_t *respbufsz) {
+
+}
 
 void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
 
@@ -79,23 +106,28 @@ void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
         {.field_id = 3, .type = VIS_INPUT, .x = 38, .y = 10, .width = 24},
         {.field_id = 4, .type = VIS_LABEL, .x = 5, .y = 5, .width = 37},
         {.field_id = 5, .type = VIS_LABEL, .x = 40, .y = 1, .width = 19},
-        
+        {.field_id = 6, .type = VIS_LABEL, .x = 38, .y = 14, .width = 17},
+        {.field_id = 7, .type = VIS_LINE, .x = 5, .y = 12, .width = 120},
+
     };
 
     struct field_state login_screen_state[] = {
-        {.field_id = 0, .fg_color = 7, .flags = 0, .text = "USER . . . . . . . . . . . ",.text_len = 27},
-        {.field_id = 1, .fg_color = 7, .flags = 0, .text = "PASSWORD . . . . . . . . . ",.text_len = 27},
-        {.field_id = 2, .fg_color = 7, .flags = 0, .text = "", .text_len = 0},
-        {.field_id = 3, .fg_color = 7, .flags = 0, .text = "", .text_len = 0},
-        {.field_id = 5, .fg_color = 7, .flags = 0, .text = "Tab to change fields, Enter to submit", .text_len = 37},
-        {.field_id = 4, .fg_color = 7, .flags = 0, .text = "Marina 59 | Sign On", .text_len = 19},
-    };
+        {.field_id = 0,   .text = "USER . . . . . . . . . . . ",.text_len = 27},
+        {.field_id = 1,   .text = "PASSWORD . . . . . . . . . ",.text_len = 27},
+        {.field_id = 2,   .text = "", .text_len = 0},
+        {.field_id = 3,   .text = "", .text_len = 0},
+        {.field_id = 4,   .flags = FAINT, .text = "Tab to change fields, Enter to submit", .text_len = 37},
+        {.field_id = 5,   .text = "Marina 59 | Sign On", .text_len = 19},
+        {.field_id = 6,   .fg_color = RED, .flags = HIDDEN, .text = "Sorry, try again.", .text_len = 17},
+        {.field_id = 7}
+
+     };
     
     u8 *pos = respbuf;
 
     struct packet_header h = { .opcode_a = 0x01,
                                .opcode_b = 0,
-                               .num_fields = 6,
+                               .num_fields = 8,
                                .reserved = 0,
                                .layout_bytes = sizeof(login_screen_layout),
                                .state_bytes = sizeof(login_screen_state)
@@ -120,7 +152,8 @@ int verify_login_credentials(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *res
     // verify user and pw
     // retunr ok, bad_user, bad_pass. 
 
-    printf("BITCHES");
+    /* send an array of state structs of only the fields you want to change add hide and unhide */
+    
     return 1;
 }
 
@@ -139,14 +172,18 @@ void big_fucking_business(u64 conn_id, u8 *reqbuf, int reqbuflen, u8 *respbuf, s
         switch(wiw->wya) {
         case LOGIN:
             printf("LOGIN");
-            wiw->wya = MAIN;
+
+            //if login verified
             // int res = verify_login_credentials(reqbuf, reqbuflen);
+            wiw->wya = MAIN;
             break;
 
         case MAIN:
             printf("MAIN");
             break;
-        } 
+        }
+        // render new screen based on state 
+
     }
 }
 
@@ -240,3 +277,13 @@ int main(void) {
       *      ├──────────────┼────────────────────────────────────────────────────────────┤
       *      │ Field 2 Block│ [ slotIndex (1 byte) ] [ stringLength (1 byte) ] [ ASCII ] │
       *      └──────────────┴────────────────────────────────────────────────────────────┘ */
+
+/* 
+
+update screen. 
+
+
+|opcodeA|opcodeB|numfield|stateBytes|
+
+
+ */

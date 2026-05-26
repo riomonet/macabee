@@ -3,6 +3,11 @@
     <head>
         <style>
 
+         body {
+             background-color: #000000; /* Default Black Screen */
+             color: #ffac00;            /* Default Amber Text */
+         }
+
          .generic-slot:focus {
              outline: none;
              box-shadow: none;
@@ -17,31 +22,74 @@
              padding: 0;
              margin: 0;
              height: 1em;
+             color: inherit;     
              
              /* Drive coordinates using typography-grid registers */
              top: calc(var(--row) * 1em);
              left: calc(var(--col) * 1ch);
-             width: calc(var(--len) * 1ch);
+             width: calc(var(--width) * 1ch);
          }
-
 
          /* Rigid input tracking frame */
          .generic-slot:not([readonly]) {
-             border-bottom: 1px solid black;
+             border-bottom: 1px solid currentColor; /* underline visible inputs */
          }
+         .generic-slot[data-bold]      { font-weight:     bold;      }
+         .generic-slot[data-faint]     { opacity:         0.5;       }
+         .generic-slot[data-underline] { text-decoration: underline; }
+         .generic-slot[data-hidden]    { visibility:     hidden;     }
+
+         .generic-slot[data-inverse]   {
+             color: var(--theme-color-bg);
+             background-color: var(--theme-color-fg);                }
+
+         .generic-slot[data-blink]    {
+             animation: terminal-blink 1s step-end infinite;         }
+
+         @keyframes terminal-blink    {
+             0%, 100% { visibility: visible; }
+             50%      { visibility: hidden;  }                       }
+
+         .generic-slot.hline {
+             pointer-events: none; 
+             user-select: none;   
+             border-bottom: 2px solid currentColor; 
+         }
+
+
+         /* --- Foreground Hardware Register Map --- */
+         .generic-slot[data-fg="9"] { color: #000000; } /* BLACK: 0, 0, 0 */
+         .generic-slot[data-fg="1"] { color: #aa0000; } /* RED: 170, 0, 0 */
+         .generic-slot[data-fg="2"] { color: #46ff00; } /* GREEN: 70, 255, 0 (Bright green target) */
+         .generic-slot[data-fg="3"] { color: #aa5500; } /* BROWN: 170, 85, 0 */
+         .generic-slot[data-fg="4"] { color: #0000aa; } /* BLUE: 0, 0, 170 */
+         .generic-slot[data-fg="5"] { color: #6241b4; } /* MAGENTA: 98, 65, 180 */
+         .generic-slot[data-fg="6"] { color: #55ffff; } /* CYAN: 85, 255, 255 */
+         .generic-slot[data-fg="7"] { color: #ffffff; } /* WHITE: standard system bright white \033[97m */
+         .generic-slot[data-fg="8"] { color: #ffac00; } /* AMBER: 255, 172, 0 */ 
+
+         /* --- Background Hardware Register Map --- */
+         .generic-slot[data-bg="9"] { background-color: #000000; } /* BLACK: 0, 0, 0 */
+         .generic-slot[data-bg="1"] { background-color: #aa0000; } /* RED: 170, 0, 0 */
+         .generic-slot[data-bg="2"] { background-color: #00aa00; } /* GREEN: 0, 170, 0 (Darker green background target) */
+         .generic-slot[data-bg="3"] { background-color: #aa5500; } /* BROWN: 170, 85, 0 */
+         .generic-slot[data-bg="4"] { background-color: #0000aa; } /* BLUE: 0, 0, 170 */
+         .generic-slot[data-bg="5"] { background-color: #ff00ff; } /* MAGENTA: 255, 0, 255 */
+         .generic-slot[data-bg="6"] { background-color: #55ffff; } /* CYAN: 85, 255, 255 */
+         .generic-slot[data-bg="7"] { background-color: #ffffff; } /* WHITE: standard system background \033[107m */
+         .generic-slot[data-bg="8"] { background-color: #ffa500; } /* AMBER: 255, 165, 0 */
+         
         </style>
     </head>
     <body>
         <div id="terminal"></div>
         <script>
-
          
          const MAX_SLOTS = 100;
          const INPUTS  = [];
          const SLOT_POOL = new Array(MAX_SLOTS);
          const terminal = document.getElementById('terminal');
          const url = "ws://localhost:8001/ws"
-
          
          for (let i = 0; i < MAX_SLOTS; i++) {
 	         const input = document.createElement('input');
@@ -68,8 +116,13 @@
                   r3: 0
               };
 
-	         input.className = 'generic-slot';
-	         input.style.display = 'none'; // Keep it dark until bytes arrive
+             input.className = 'generic-slot';
+             
+             input.style.setProperty('--row', 0);
+             input.style.setProperty('--col', 0);
+             input.style.setProperty('--width', 0);
+             input.toggleAttribute('data-hidden',true);
+             
 	         input.disabled= true;
 	         input.tabIndex = -1;
 	         input.slotId = i;
@@ -78,6 +131,7 @@
              input.spellcheck = false;
              input.autocorrect = 'off';
              input.autocapitalize = 'off';
+             
 	         terminal.appendChild(input);
 	         SLOT_POOL[i] = input;
          }
@@ -86,10 +140,6 @@
          disableTabDefaults();
          add_AID_keys();
 
-         const cbOpcode = Object.freeze({
-             
-         });
-         
 
          const AID_KEYS = Object.freeze ({
              'Enter': 0x7D,
@@ -112,11 +162,32 @@
              UPDATE: 0x02
          });
 
+         const DSP = Object.freeze({
+             BOLD:      1 << 0,
+             FAINT:     1 << 1,
+             INVERSE:   1 << 2,
+             BLINK:     1 << 3,
+             UNDERLINE: 1 << 4,
+             HIDDEN:    1 << 5,
+             PASSWORD:  1 << 6
+         });
+
+         const TYP = Object.freeze({
+             INPUT: 1 << 0,
+             LABEL: 1 << 1,
+             HLINE: 1 << 2,
+         });
+
 
          function globalReset() {
              INPUTS.length = 0;
              for (let i = 0; i < MAX_SLOTS; i++) {
-                 SLOT_POOL[i].isDirty = false;
+                 const handle = SLOT_POOL[i];
+                 handle.isDirty = false;
+                 /* handle.style.display = 'none';
+                  * handle.classList.remove('label', 'hline');
+                  * handle.oninput = null;
+                  * handle.tabIndex = -1; */
              }
          }
                           
@@ -253,25 +324,50 @@
                  handle.state.len = textLen
 
 		         handle.value = decoder.decode(textBytes);                 
-	             handle.style.display = 'block';
 	             handle.disabled = false;
                  handle.style.setProperty('--row', handle.layout.row);
-                 handle.style.setProperty('--col', handle.layout.col);
-                 handle.style.setProperty('--len', handle.layout.width);
+                 handle.style.setProperty('--col', handle.layout.col); //column not color
+                 handle.style.setProperty('--width', handle.layout.width);
                  handle.maxLength = handle.layout.width;
+                 
+                 handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); //
+                 handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
+                 handle.toggleAttribute('data-inverse',   handle.state.flags & DSP.INVERSE);
+                 handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
+                 handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
+                 handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
 
-                 if (handle.layout.typ === 1) {
-                     handle.readOnly = true;
-                     handle.classList.add('label');
-                 } else {
-                     handle.readOnly = false;
-		             handle.tabIndex = 0;
-		             handle.oninput = set_dirty;
-                     INPUTS.push(handle);
+                 
+                 handle.setAttribute('data-fg', handle.state.fgColor);
+                 handle.setAttribute('data-bg', handle.state.bgColor);       
+
+                 switch (handle.layout.typ) {
+                     case TYP.LABEL:
+                         { console.log('label');
+                             handle.readOnly = true;
+                             handle.classList.add('label');
+                         } break;
+                     case TYP.INPUT:
+                         {
+                             console.log('input');
+                             handle.readOnly = false;
+		                     handle.tabIndex = 0;
+		                     handle.oninput = set_dirty;
+                             INPUTS.push(handle);
+                         } break;
+                     case TYP.HLINE:
+                         {
+                             console.log('line');
+                             handle.readOnly = true;
+                             handle.classList.add('hline');
+                             handle.value    = ''; 
+                             handle.tabIndex = -1; 
+                         } break;
                  }
-             }
-             /* TODO: this should be encoded in flags */
+                 
+             /* TODO: this should be encoded in flags set with ic */
              SLOT_POOL[2].focus();
+             }
          }
 
          function sys_net_init(url) {
