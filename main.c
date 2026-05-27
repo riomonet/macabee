@@ -18,6 +18,13 @@
 #define VIS_LINE  1 << 2
 #define MAX_FLD_SIZE 40
 
+struct __attribute__((packed)) update_header {
+    u8 opcode_a;
+    u8 opcode_b;
+    u8 num_fields;
+    u8 reserved;
+    u16 state_bytes;
+};
 
 struct __attribute__((packed)) packet_header {
     u8 opcode_a;
@@ -93,8 +100,27 @@ enum DSP {
     PASSWORD  = 1 << 7
 };
 
-void login_failed_fuck_off_jk_try_again(u8 *respbuf, size_t *respbufsz) {
+void update_failed_login_screen (u8 *respbuf, size_t *respbufsz) {
+    struct field_state login_screen_state[] = {
+        {.field_id = 6,  .fg_color = RED, .text = "Sorry, try again.", .text_len = 17},
+     };
+    
+    u8 *pos = respbuf;
+    struct update_header h = { .opcode_a = 0x02,
+                               .opcode_b = 0,
+                               .num_fields = 1,
+                               .reserved = 0,
+                               .state_bytes = sizeof(login_screen_state)
+    };
+    
+    memcpy(pos, &h, sizeof(h));
+    pos += sizeof(h);
+    
+    memcpy(pos,login_screen_state, sizeof(login_screen_state));
+    pos += sizeof(login_screen_state);
+    
 
+    *respbufsz = (size_t)(pos - respbuf);
 }
 
 void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
@@ -107,7 +133,6 @@ void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
         {.field_id = 4, .type = VIS_LABEL, .x = 5, .y = 5, .width = 37},
         {.field_id = 5, .type = VIS_LABEL, .x = 40, .y = 1, .width = 19},
         {.field_id = 6, .type = VIS_LABEL, .x = 38, .y = 14, .width = 17},
-        {.field_id = 7, .type = VIS_LINE, .x = 5, .y = 12, .width = 120},
 
     };
 
@@ -119,15 +144,13 @@ void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
         {.field_id = 4,   .flags = FAINT, .text = "Tab to change fields, Enter to submit", .text_len = 37},
         {.field_id = 5,   .text = "Marina 59 | Sign On", .text_len = 19},
         {.field_id = 6,   .fg_color = RED, .flags = HIDDEN, .text = "Sorry, try again.", .text_len = 17},
-        {.field_id = 7}
-
      };
     
     u8 *pos = respbuf;
 
     struct packet_header h = { .opcode_a = 0x01,
                                .opcode_b = 0,
-                               .num_fields = 8,
+                               .num_fields = 7,
                                .reserved = 0,
                                .layout_bytes = sizeof(login_screen_layout),
                                .state_bytes = sizeof(login_screen_state)

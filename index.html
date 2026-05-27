@@ -4,8 +4,8 @@
         <style>
 
          body {
-             background-color: #000000; /* Default Black Screen */
-             color: #ffac00;            /* Default Amber Text */
+             background-color: var(--theme-bg);
+             color: var(--theme-fg);
          }
 
          .generic-slot:focus {
@@ -37,13 +37,10 @@
          .generic-slot[data-bold]      { font-weight:     bold;      }
          .generic-slot[data-faint]     { opacity:         0.5;       }
          .generic-slot[data-underline] { text-decoration: underline; }
-         .generic-slot[data-hidden]    { visibility:     hidden;     }
+         .generic-slot[data-hidden]    { visibility:      hidden;    }
 
-         .generic-slot[data-inverse]   {
-             color: var(--theme-color-bg);
-             background-color: var(--theme-color-fg);                }
 
-         .generic-slot[data-blink]    {
+         .generic-slot[data-blink]     {
              animation: terminal-blink 1s step-end infinite;         }
 
          @keyframes terminal-blink    {
@@ -53,12 +50,12 @@
          .generic-slot.hline {
              pointer-events: none; 
              user-select: none;   
-             border-bottom: 2px solid currentColor; 
+             border-bottom: 1px solid currentColor; 
          }
 
 
          /* --- Foreground Hardware Register Map --- */
-         .generic-slot[data-fg="9"] { color: #000000; } /* BLACK: 0, 0, 0 */
+
          .generic-slot[data-fg="1"] { color: #aa0000; } /* RED: 170, 0, 0 */
          .generic-slot[data-fg="2"] { color: #46ff00; } /* GREEN: 70, 255, 0 (Bright green target) */
          .generic-slot[data-fg="3"] { color: #aa5500; } /* BROWN: 170, 85, 0 */
@@ -66,10 +63,11 @@
          .generic-slot[data-fg="5"] { color: #6241b4; } /* MAGENTA: 98, 65, 180 */
          .generic-slot[data-fg="6"] { color: #55ffff; } /* CYAN: 85, 255, 255 */
          .generic-slot[data-fg="7"] { color: #ffffff; } /* WHITE: standard system bright white \033[97m */
-         .generic-slot[data-fg="8"] { color: #ffac00; } /* AMBER: 255, 172, 0 */ 
+         .generic-slot[data-fg="8"] { color: #ffac00; } /* AMBER: 255, 172, 0 */
+         .generic-slot[data-fg="9"] { color: #000000; } /* BLACK: 0, 0, 0 */
 
          /* --- Background Hardware Register Map --- */
-         .generic-slot[data-bg="9"] { background-color: #000000; } /* BLACK: 0, 0, 0 */
+
          .generic-slot[data-bg="1"] { background-color: #aa0000; } /* RED: 170, 0, 0 */
          .generic-slot[data-bg="2"] { background-color: #00aa00; } /* GREEN: 0, 170, 0 (Darker green background target) */
          .generic-slot[data-bg="3"] { background-color: #aa5500; } /* BROWN: 170, 85, 0 */
@@ -78,6 +76,7 @@
          .generic-slot[data-bg="6"] { background-color: #55ffff; } /* CYAN: 85, 255, 255 */
          .generic-slot[data-bg="7"] { background-color: #ffffff; } /* WHITE: standard system background \033[107m */
          .generic-slot[data-bg="8"] { background-color: #ffa500; } /* AMBER: 255, 165, 0 */
+         .generic-slot[data-bg="9"] { background-color: #000000; } /* BLACK: 0, 0, 0 */
          
         </style>
     </head>
@@ -162,6 +161,50 @@
              UPDATE: 0x02
          });
 
+         const COLORS = Object.freeze ({
+             BLACK:   '#000000',
+             RED:     '#aa0000',
+             GREEN:   '#46ff00',
+             BROWN:   '#aa5500',
+             BLUE:    '#0000aa',
+             MAGENTA: '#6241b4',
+             CYAN:    '#55ffff',
+             WHITE:   '#ffffff',
+             AMBER:   '#ffac00'
+         });
+
+
+         const COLREG = Object.freeze ({
+             RED:     1,
+             GREEN:   2,
+             BROWN:   3,
+             BLUE:    4,
+             MAGENTA: 5,
+             CYAN:    6,
+             WHITE:   7,
+             AMBER:   8,
+             BLACK:   9,
+         });
+
+         const defColors = {
+             bg: COLREG.BLACK,
+             fg: COLREG.AMBER
+         };
+
+         const defColorsGlobal = {
+             bg: COLORS.BLACK,
+             fg: COLORS.AMBER
+         };
+
+         document.body.style.setProperty('--theme-bg', defColorsGlobal.bg);
+         document.body.style.setProperty('--theme-fg', defColorsGlobal.fg);
+
+
+         const OPCODE_C = Object.freeze ({
+             STD:    0x01
+         });
+
+
          const DSP = Object.freeze({
              BOLD:      1 << 0,
              FAINT:     1 << 1,
@@ -223,6 +266,8 @@
              let bytes = 0;
              const encoder = new TextEncoder();
              const AID = AID_KEYS[key];
+
+             bytes++; /* Opocde C */
              bytes++; /* AIDkey 1b*/
              bytes++; /* nFields 1b*/
              for (let i = 0; i < INPUTS.length; i++) {
@@ -237,6 +282,7 @@
              const buffer = new ArrayBuffer(bytes);
              const copybook = new Uint8Array(buffer);
              let pos = 0;
+             copybook[pos++] = OPCODE_C.STD;
              copybook[pos++] = AID; //aidkey resolve
              copybook[pos++] = MDT.length;
              for(let i = 0; i <  MDT.length; i++) {
@@ -271,6 +317,7 @@
          }
 
          function sys_render_terminal(view) {
+
 	         const decoder          = new TextDecoder('utf-8');
              const headerSize       = 8;
              const opcodeB          = view.getUint8(1);
@@ -321,7 +368,7 @@
                  handle.state.flags = flags
                  handle.state.fgColor = fgColor;
                  handle.state.bgColor = bgColor;
-                 handle.state.len = textLen
+                 handle.state.len = textLen;
 
 		         handle.value = decoder.decode(textBytes);                 
 	             handle.disabled = false;
@@ -332,15 +379,26 @@
                  
                  handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); //
                  handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
-                 handle.toggleAttribute('data-inverse',   handle.state.flags & DSP.INVERSE);
                  handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
                  handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
                  handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
 
-                 
-                 handle.setAttribute('data-fg', handle.state.fgColor);
-                 handle.setAttribute('data-bg', handle.state.bgColor);       
 
+                 handle.setAttribute('data-fg', handle.state.fgColor);
+                 handle.setAttribute('data-bg', handle.state.bgColor);
+
+                 if (handle.state.flags & DSP.INVERSE) {
+                     handle.state.inverse = true;
+                     handle.setAttribute('data-fg', (handle.state.bgColor || defColors.bg));
+                     handle.setAttribute('data-bg', (handle.state.fgColor || defColors.fg));
+                 } else {
+                     if (handle.state.inverse) {
+                         handle.state.inverse = false;
+                         handle.setAttribute('data-fg', (handle.state.fgColor || defColors.fg));
+                         handle.setAttribute('data-bg', (handle.state.bgColor || defColors.bg));
+                     }
+                 }
+                 
                  switch (handle.layout.typ) {
                      case TYP.LABEL:
                          { console.log('label');
