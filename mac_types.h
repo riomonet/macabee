@@ -36,7 +36,7 @@ struct __attribute__((packed)) packet_header {
 };
 
 
-// Immutable
+// Immutable 1 for each field
 struct __attribute__((packed)) field_layout {
     u8 field_id;
     u8 type; // (label | input)

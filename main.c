@@ -16,10 +16,10 @@
 #define LABEL(id, xx, yy, ww, txt) \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0)
 
-#define INPUT(id, xx, yy, ww)                   \
+#define INPUT(id, xx, yy, ww)                  \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0)
 
-#define HL(id, xx, yy, ww)                   \
+#define HL(id, xx, yy, ww)                      \
     X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0)
 
 #define LABEL_F(id, xx, yy, ww, txt, flg)                       \
@@ -42,34 +42,43 @@
 
 #define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
 
-#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr)    \
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr)   \
     {       .op_A = (opA),                                  \
             .op_B = (opB),                                  \
             .layout = (layout_arr),                         \
             .state = (state_arr),                           \
-            .nFields = MAX_SLOTS(state_arr)              \
-            }
+            .nFields = MAX_SLOTS(state_arr)                 \
+}
 
 /* -------------------- LOGIN SCREEN --------------------- */
 
 #define LOGIN_SCREEN_FIELDS                                             \
-    LABEL(0,  9,  8, 27, "USER . . . . . . . . . . . ")                 \
-    LABEL(1,  9, 10, 27, "PASSWORD . . . . . . . . . ")                 \
-    INPUT(2, 38,  8, 24)                                                \
-    INPUT(3, 38, 10, 24)                                                \
-    LABEL_F(4,  5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
-    LABEL(5, 40,  1, 19, "Marina 59 | Sign On")                         \
-    STATUS(6, 38, 14, 17, "Sorry, try again.", HIDDEN, RED)
+    LABEL(LOGIN_L1,  9,  8, 27, "USER . . . . . . . . . . . ")  \
+        LABEL(LOGIN_L2,  9, 10, 27, "PASSWORD . . . . . . . . . ") \
+        INPUT(LOGIN_IUSER, 38,  8, 24)                             \
+        INPUT(LOGIN_IPW,38, 10, 24)                                \
+        LABEL_F(LOGIN_L3,5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
+        LABEL(LOGIN_L4, 40,  1, 19, "Marina 59 | Sign On")           \
+        STATUS(LOGIN_L5,38, 14, 17, "Sorry, try again.", HIDDEN, RED)
+
+
+#define X(id, t, x, y, w, txt, len, flg, col) id,
+enum LOGIN_SCR_IDX {
+    LOGIN_SCREEN_FIELDS
+    LOGIN_FIELD_COUNT
+};
+#undef X
+
 
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
-    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
+    [id] = { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
     struct field_layout login_screen_layout[] = {
         LOGIN_SCREEN_FIELDS 
     };
 #undef X
 
 #define X(id, t, x, y, w, txt, len, flg, col)               \
-    { .field_id = (id), .text = (txt), .text_len = (len),   \
+   [id] = { .field_id = (id), .text = (txt), .text_len = (len),   \
             .fg_color = (col), .flags = (flg) },
     struct field_state login_screen_state[] = {
         LOGIN_SCREEN_FIELDS
@@ -80,25 +89,32 @@
 /* --------------------------------------------END LOGIN SCREENS ---------------------------------------------- */
 /* -------------------------------------------- MAIN SCREEN START --------------------------------------------- */
 /*   id, col, row, width */
-#define MAIN_SCREEN_FIELDS                          \
-    LABEL(0,7,1,8, "DSP_USER")                      \
-    LABEL(1,67,1,8, "DSP_DATE")                     \
-    LABEL(2,67,1,8, "DSP_TIME")                     \
-    INPUT(3,6,24,1)                                 \
-    LABEL(4,29,1,21, "Marina Access Control")       \
-    LABEL(5,35,2,9, "MAIN MENU")                    \
-    LABEL(6,6,6,28, "Select one of the following:") \
-    LABEL(7,10,8,15,   "1. Add customer")           \
-    LABEL(8,10,9,17,   "2. View customers")         \
-    LABEL(9,10,10,17,  "3. Access history")         \
-    LABEL(10,10,11,15,  "4. Live montior")          \
-    LABEL(11,1,23,9,"Selection")                    \
-    LABEL(12,1,24,4, "===>")                        \
-    HL(13,1,26,100)                                 \
-    LABEL(14,6,28,9,"F6=Logout")                    \
-    LABEL(15,19,28,9, "F7=Search")                  \
-    LABEL(16,31,28,16,"F8=Redraw screen")           \
-    HL(17,0,29,100)
+#define MAIN_SCREEN_FIELDS                                      \
+    LABEL(MAIN_L1,7,1,8, "DSP_USER")                            \
+        LABEL(MAIN_L2,67,1,8, "DSP_DATE")                       \
+        LABEL(MAIN_L3,67,2,8, "DSP_TIME")                       \
+        INPUT(MAIN_ISELECT,6,24,1)                              \
+        LABEL(MAIN_L4,29,1,21, "Marina Access Control")         \
+        LABEL(MAIN_L5,35,2,9, "MAIN MENU")                      \
+        LABEL(MAIN_L6,6,6,28, "Select one of the following:")   \
+        LABEL(MAIN_L7,10,8,15,   "1. Add customer")             \
+        LABEL(MAIN_L8,10,9,17,   "2. View customers")           \
+    LABEL(MAIN_L9,10,10,17,  "3. Access history")               \
+    LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
+    LABEL(MAIN_L11,1,23,9,"Selection")                          \
+    LABEL(MAIN_L12,1,24,4, "===>")                              \
+    HL(MAIN_L13,1,26,100)                                       \
+    LABEL(MAIN_L14,6,28,9,"F6=Logout")                          \
+    LABEL(MAIN_L15,19,28,9, "F7=Search")                        \
+    LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")                 \
+    HL(MAIN_L17,0,29,100)
+
+#define X(id, t, x, y, w, txt, len, flg, col) id,
+enum MAIN_SCR_IDX {
+    MAIN_SCREEN_FIELDS
+    MAIN_FIELD_COUNT
+};
+#undef X
 
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
@@ -112,10 +128,8 @@
             .fg_color = (col), .flags = (flg) },
     struct field_state main_screen_state[] = {
         MAIN_SCREEN_FIELDS
-    }; 
+    };
 #undef X
-
-
 
 /* -------------------------------------------- MAIN SCREEN END --------------------------------------------- */
 
@@ -132,6 +146,7 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
         is_new = 1;
     }
 
+        
     size_t layout_bytes = (is_new * num_fields) * sizeof(struct field_layout);
     size_t state_bytes =  num_fields * sizeof(struct field_state);
     size_t total_bytes = layout_bytes  + state_bytes + sizeof(struct packet_header);
@@ -169,6 +184,7 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
 struct screen {
     u8 op_A;
     u8 op_B;
+    u8 ic;
     size_t nFields;
     struct field_layout *layout;
     struct field_state *state;
@@ -179,8 +195,6 @@ struct screen screens[] = {
     [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state),
     [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state)
 };
-
-
 
 
 /* ---------------------------- state management ------------------------------------------------------------------- */
@@ -257,7 +271,8 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
                                                                   nxt_scr.layout, 
                                                                   nxt_scr.nFields, 
                                                                   nxt_scr.op_A, 
-                                                                  nxt_scr.op_B);
+                                                                   nxt_scr.op_B
+                                                                   );
               
               mg_ws_send(c, payload.buf,payload.len, WEBSOCKET_OP_BINARY);
             }
@@ -328,7 +343,7 @@ int main(void) {
 
 /* 
 
-update screen. 
+update screen 
 
 
 |opcodeA|opcodeB|numfield|stateBytes|
