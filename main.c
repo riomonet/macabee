@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -13,63 +12,157 @@
 ===============================================================================*/
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
-#define VIS_INPUT 1 << 0
-#define VIS_LABEL 1 << 1
-#define VIS_LINE  1 << 2
-#define MAX_FLD_SIZE 40
 
-struct __attribute__((packed)) update_header {
-    u8 opcode_a;
-    u8 opcode_b;
-    u8 num_fields;
-    u8 reserved;
-    u16 state_bytes;
+
+#define LABEL(id, xx, yy, ww, txt) \
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0)
+
+#define INPUT(id, xx, yy, ww)                   \
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0)
+
+#define LABEL_F(id, xx, yy, ww, txt, flg)                       \
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0)
+
+#define LABEL_C(id, xx, yy, ww, txt, col) \
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col)
+
+#define LABEL_CF(id, xx, yy, ww, txt, flg, col) \
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col)
+
+#define STATUS(id, xx, yy, ww, txt, flg, col) \
+    LABEL_CF(id, xx, yy, ww, txt, flg, col)
+
+#define STATE(id, txt, flg, col) \
+    X(id, txt, sizeof(txt)-1, flg, col)
+
+#define STATE_LEN(id, txt, len, flg, col) \
+    X(id, txt, len, flg, col)
+
+/* void update_failed_login_screen (u8 *respbuf, size_t *respbufsz) { */
+/* #define LOGIN_ERROR_UPDATE                      \ */
+/*     STATE(6, "Sorry, try again.", 0, RED) */
+
+/*     // Generate the state-only array (or just a single struct) */
+/* #define X(id, txt, len, flg, col)                           \ */
+/*     { .field_id = (id), .text = (txt), .text_len = (len),   \ */
+/*             .fg_color = (col), .flags = (flg) } */
+
+/*     struct field_state login_error_update[] = { LOGIN_ERROR_UPDATE }; */
+/* #undef X */
+    
+/*     u8 *pos = respbuf; */
+/*     struct update_header h = { .opcode_a = 0x02, */
+/*                                .opcode_b = 0, */
+/*                                .num_fields = 1, */
+/*                                .reserved = 0, */
+/*                                .state_bytes = sizeof(login_error_update) */
+/*     }; */
+/*     memcpy(pos, &h, sizeof(h)); */
+/*     pos += sizeof(h); */
+/*     memcpy(pos,login_error_update, sizeof(login_error_update)); */
+/*     pos += sizeof(login_error_update); */
+/*     *respbufsz = (size_t)(pos - respbuf); */
+/* } */
+
+struct screen {
+    int id;
+    u8 *buf;
+    size_t len;
 };
 
-struct __attribute__((packed)) packet_header {
-    u8 opcode_a;
-    u8 opcode_b;
-    u8 num_fields;
-    u8 reserved;
-    u16 layout_bytes;
-    u16 state_bytes;
+struct screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB) {
+    int is_new = 0;
+    if (opA == OP_A_NEW)  {
+        is_new = 1;
+    }
+
+    size_t layout_bytes = (is_new * num_fields) * sizeof(struct field_layout);
+    size_t state_bytes =  num_fields * sizeof(struct field_state);
+    size_t total_bytes = layout_bytes  + state_bytes + sizeof(struct packet_header);
+
+    struct packet_header h = { .opcode_a = opA,
+                               .opcode_b = opB,
+                               .num_fields = num_fields,
+                               .reserved = 0,
+                               .layout_bytes = layout_bytes,
+                               .state_bytes =  state_bytes
+    };
+    
+    struct screen scr = {
+        .id = 1,
+        .buf = malloc(total_bytes),
+        .len = total_bytes
+    };
+
+    u8 *pos = scr.buf;
+
+    memcpy(pos, &h, sizeof(h));
+    pos += sizeof(h);
+
+    if (is_new) {
+    memcpy(pos, fl, h.layout_bytes);
+    pos += layout_bytes;
+    }
+
+    memcpy(pos,fs, state_bytes);
+    pos += state_bytes;
+
+    return scr;
+}
+
+#define LOGIN_SCREEN_FIELDS                             \
+    LABEL(0,  9,  8, 27, "USER . . . . . . . . . . . ") \
+    LABEL(1,  9, 10, 27, "PASSWORD . . . . . . . . . ") \
+    INPUT(2, 38,  8, 24) \
+    INPUT(3, 38, 10, 24) \
+    LABEL_F(4,  5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
+    LABEL(5, 40,  1, 19, "Marina 59 | Sign On") \
+    STATUS(6, 38, 14, 17, "Sorry, try again.", HIDDEN, RED)
+
+#define X(id, t, xx, yy, w, txt, len, flg, col)                         \
+    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
+    struct field_layout login_screen_layout[] = {
+        LOGIN_SCREEN_FIELDS 
+    };
+#undef X
+
+#define X(id, t, x, y, w, txt, len, flg, col)               \
+    { .field_id = (id), .text = (txt), .text_len = (len),   \
+            .fg_color = (col), .flags = (flg) },
+    struct field_state login_screen_state[] = {
+        LOGIN_SCREEN_FIELDS
+    }; 
+#undef X
+
+struct sc {
+    u8 op_A;
+    u8 op_B;
+    size_t nFields;
+    struct field_layout *layout;
+    struct field_state *state;
 };
 
-// Immutable
-struct __attribute__((packed)) field_layout {
-    u8 field_id;
-    u8 type; // (label | input)
-    u8 x;
-    u8 y;
-    u8 width;
-    u8 r1;
-    u8 r2;
-    u8 r3;
+#define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
+
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr)    \
+    {       .op_A = (opA),                                  \
+            .op_B = (opB),                                  \
+            .layout = (layout_arr),                         \
+            .state = (state_arr),                           \
+            .nFields = MAX_SLOTS(state_arr)              \
+            }
+
+struct sc screens[] = {
+    [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state)
 };
 
-// Mutatable
-struct __attribute__((packed)) field_state {
-    u8 field_id;
-    u8 flags;
-    u8 fg_color;
-    u8 bg_color;
-    u8 text_len;
-    u8 r1;
-    u8 r2;
-    u8 r3;
-    char text[MAX_FLD_SIZE];
-};
 
-enum where_you_at {
-    LOGIN, MAIN
-};
 
-enum permissions {
-    ADMIN, CUSTOMER
-};
+/* ---------------------------- state management ------------------------------------------------------------------- */
 
 struct who_is_where {
     u64 conn_id;
+
     enum where_you_at wya;
     enum permissions p;
     UT_hash_handle hh;
@@ -77,98 +170,6 @@ struct who_is_where {
 
 struct who_is_where *users = NULL;
 
-enum colors {
-    BLACK,
-    RED,
-    GREEN,
-    BROWN,
-    BLUE,
-    MAGENTA,
-    CYAN,
-    WHITE,
-    AMBER
-};
-
-enum DSP {
-    BOLD      = 1 << 0,
-    FAINT     = 1 << 1,
-    INVERSE   = 1 << 2,
-    BLINK     = 1 << 3,
-    UNDERLINE = 1 << 4,
-    HIDDEN    = 1 << 5,
-    H_LINE    = 1 << 6,
-    PASSWORD  = 1 << 7
-};
-
-void update_failed_login_screen (u8 *respbuf, size_t *respbufsz) {
-    struct field_state login_screen_state[] = {
-        {.field_id = 6,  .fg_color = RED, .text = "Sorry, try again.", .text_len = 17},
-     };
-    
-    u8 *pos = respbuf;
-    struct update_header h = { .opcode_a = 0x02,
-                               .opcode_b = 0,
-                               .num_fields = 1,
-                               .reserved = 0,
-                               .state_bytes = sizeof(login_screen_state)
-    };
-    
-    memcpy(pos, &h, sizeof(h));
-    pos += sizeof(h);
-    
-    memcpy(pos,login_screen_state, sizeof(login_screen_state));
-    pos += sizeof(login_screen_state);
-    
-
-    *respbufsz = (size_t)(pos - respbuf);
-}
-
-void make_me_a_login_screen (u8 *respbuf, size_t *respbufsz) {
-
-    struct field_layout login_screen_layout[] = {
-        {.field_id = 0, .type = VIS_LABEL, .x = 9, .y = 8, .width = 27},
-        {.field_id = 1, .type = VIS_LABEL, .x = 9, .y = 10, .width = 27},
-        {.field_id = 2, .type = VIS_INPUT, .x = 38, .y = 8, .width = 24},
-        {.field_id = 3, .type = VIS_INPUT, .x = 38, .y = 10, .width = 24},
-        {.field_id = 4, .type = VIS_LABEL, .x = 5, .y = 5, .width = 37},
-        {.field_id = 5, .type = VIS_LABEL, .x = 40, .y = 1, .width = 19},
-        {.field_id = 6, .type = VIS_LABEL, .x = 38, .y = 14, .width = 17},
-
-    };
-
-    struct field_state login_screen_state[] = {
-        {.field_id = 0,   .text = "USER . . . . . . . . . . . ",.text_len = 27},
-        {.field_id = 1,   .text = "PASSWORD . . . . . . . . . ",.text_len = 27},
-        {.field_id = 2,   .text = "", .text_len = 0},
-        {.field_id = 3,   .text = "", .text_len = 0},
-        {.field_id = 4,   .flags = FAINT, .text = "Tab to change fields, Enter to submit", .text_len = 37},
-        {.field_id = 5,   .text = "Marina 59 | Sign On", .text_len = 19},
-        {.field_id = 6,   .fg_color = RED, .flags = HIDDEN, .text = "Sorry, try again.", .text_len = 17},
-     };
-    
-    u8 *pos = respbuf;
-
-    struct packet_header h = { .opcode_a = 0x01,
-                               .opcode_b = 0,
-                               .num_fields = 7,
-                               .reserved = 0,
-                               .layout_bytes = sizeof(login_screen_layout),
-                               .state_bytes = sizeof(login_screen_state)
-    };
-    
-    memcpy(pos, &h, sizeof(h));
-    pos += sizeof(h);
-    
-    memcpy(pos, login_screen_layout, sizeof(login_screen_layout));
-    pos += sizeof(login_screen_layout);
-    
-    memcpy(pos,login_screen_state, sizeof(login_screen_state));
-    pos += sizeof(login_screen_state);
-    
-    *respbufsz = (size_t)(pos - respbuf);
-}
-
-/* ---------------------------- state management ------------------------------------------------------------------- */
 int verify_login_credentials(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
     // extract user  
     // extract pw 
@@ -182,26 +183,27 @@ int verify_login_credentials(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *res
 
 /* respbuf is created in mongoose portion, that we fill in to
  send back out over the wire.*/
-void big_fucking_business(u64 conn_id, u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
+struct screen big_fucking_business(u64 conn_id, u8 *reqbuf, int reqbuflen) {
     struct who_is_where *wiw = NULL;
     HASH_FIND_INT(users,&conn_id,wiw);
     if (!wiw) {
         struct who_is_where *wiw = malloc(sizeof(*wiw));
         wiw->conn_id = conn_id;
-        wiw->wya = LOGIN;
+        wiw->wya = SCR_LOGIN;
         HASH_ADD_INT(users, conn_id, wiw);
-        make_me_a_login_screen(respbuf, respbufsz);
+        struct sc scr = screens[SCR_LOGIN];
+        return serialize_screen(scr.state, scr.layout, scr.nFields, scr.op_A, scr.op_B);
     } else {
         switch(wiw->wya) {
-        case LOGIN:
+        case SCR_LOGIN:
             printf("LOGIN");
 
             //if login verified
             // int res = verify_login_credentials(reqbuf, reqbuflen);
-            wiw->wya = MAIN;
+            wiw->wya = SCR_MAIN;
             break;
 
-        case MAIN:
+        case SCR_MAIN:
             printf("MAIN");
             break;
         }
@@ -230,11 +232,8 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         {
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
-              size_t respbufsz = 0;
-              u8 respbuf[4096] = {0};
-              big_fucking_business(c->id, (u8*)wm->data.buf, wm->data.len,
-                                   respbuf, &respbufsz);
-              mg_ws_send(c, respbuf, respbufsz, WEBSOCKET_OP_BINARY);
+              struct screen scr = big_fucking_business(c->id, (u8*)wm->data.buf, wm->data.len);
+              mg_ws_send(c, scr.buf,scr.len, WEBSOCKET_OP_BINARY);
             }
         }
     }
@@ -310,3 +309,17 @@ update screen.
 
 
  */
+/* #define MAIN_MENU_FIELDS \ */
+/*     LABEL(0, 10, 5, 30, "MAIN MENU") \ */
+/*     LABEL(1, 10, 8, 30, "1. Accounts") \ */
+/*     // ... etc. */
+
+/* #define X(id, t, x, y, w, txt, len, flg, col) { .field_id = id, .type = t, .x = x, .y = y, .width = w }, */
+/* struct field_layout main_menu_layout[] = { MAIN_MENU_FIELDS }; */
+/* #undef X */
+
+/* #define X(id, t, x, y, w, txt, len, flg, col) { .field_id = id, .text = txt, .text_len = len, .fg_color = col, .flags = flg }, */
+/* struct field_state main_menu_state[] = { MAIN_MENU_FIELDS }; */
+/* #undef X */
+
+
