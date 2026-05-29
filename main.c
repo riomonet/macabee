@@ -42,13 +42,14 @@
 
 #define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
 
-#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr)   \
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos)   \
     {       .op_A = (opA),                                  \
             .op_B = (opB),                                  \
             .layout = (layout_arr),                         \
             .state = (state_arr),                           \
-            .nFields = MAX_SLOTS(state_arr)                 \
-}
+            .nFields = MAX_SLOTS(state_arr),                \
+            .ic = (cursor_pos)                              \
+    }
 
 /* -------------------- LOGIN SCREEN --------------------- */
 
@@ -107,7 +108,8 @@ enum LOGIN_SCR_IDX {
     LABEL(MAIN_L14,6,28,9,"F6=Logout")                          \
     LABEL(MAIN_L15,19,28,9, "F7=Search")                        \
     LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")                 \
-    HL(MAIN_L17,0,29,100)
+    HL(MAIN_L17,0,29,100)                                      \
+    HL(MAIN_HL3,7,24,90)                                     
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum MAIN_SCR_IDX {
@@ -140,7 +142,7 @@ struct net_payload_screen {
     size_t len;
 };
 
-struct net_payload_screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB) {
+struct net_payload_screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB, u8 ic) {
     int is_new = 0;
     if (opA == OP_A_NEW)  {
         is_new = 1;
@@ -154,7 +156,7 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
     struct packet_header h = { .opcode_a = opA,
                                .opcode_b = opB,
                                .num_fields = num_fields,
-                               .reserved = 0,
+                               .reserved = ic,
                                .layout_bytes = layout_bytes,
                                .state_bytes =  state_bytes
     };
@@ -192,8 +194,8 @@ struct screen {
 
 /* |--------------------------------------- ALL SCREEN DEFINTIONNS HERE -------------------------------- */
 struct screen screens[] = {
-    [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state),
-    [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state)
+    [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state,LOGIN_IUSER),
+    [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
 };
 
 
@@ -268,10 +270,11 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
               struct screen nxt_scr = dispatch_business_logic(c->id, (u8*)wm->data.buf, wm->data.len);
               struct net_payload_screen payload = serialize_screen(nxt_scr.state, 
-                                                                  nxt_scr.layout, 
-                                                                  nxt_scr.nFields, 
+                                                                   nxt_scr.layout, 
+                                                                   nxt_scr.nFields, 
                                                                   nxt_scr.op_A, 
-                                                                   nxt_scr.op_B
+                                                                   nxt_scr.op_B,
+                                                                   nxt_scr.ic
                                                                    );
               
               mg_ws_send(c, payload.buf,payload.len, WEBSOCKET_OP_BINARY);
