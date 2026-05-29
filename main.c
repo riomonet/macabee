@@ -13,12 +13,14 @@
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
 
-
 #define LABEL(id, xx, yy, ww, txt) \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0)
 
 #define INPUT(id, xx, yy, ww)                   \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0)
+
+#define HL(id, xx, yy, ww)                   \
+    X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0)
 
 #define LABEL_F(id, xx, yy, ww, txt, flg)                       \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0)
@@ -38,39 +40,93 @@
 #define STATE_LEN(id, txt, len, flg, col) \
     X(id, txt, len, flg, col)
 
-/* void update_failed_login_screen (u8 *respbuf, size_t *respbufsz) { */
-/* #define LOGIN_ERROR_UPDATE                      \ */
-/*     STATE(6, "Sorry, try again.", 0, RED) */
+#define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
 
-/*     // Generate the state-only array (or just a single struct) */
-/* #define X(id, txt, len, flg, col)                           \ */
-/*     { .field_id = (id), .text = (txt), .text_len = (len),   \ */
-/*             .fg_color = (col), .flags = (flg) } */
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr)    \
+    {       .op_A = (opA),                                  \
+            .op_B = (opB),                                  \
+            .layout = (layout_arr),                         \
+            .state = (state_arr),                           \
+            .nFields = MAX_SLOTS(state_arr)              \
+            }
 
-/*     struct field_state login_error_update[] = { LOGIN_ERROR_UPDATE }; */
-/* #undef X */
-    
-/*     u8 *pos = respbuf; */
-/*     struct update_header h = { .opcode_a = 0x02, */
-/*                                .opcode_b = 0, */
-/*                                .num_fields = 1, */
-/*                                .reserved = 0, */
-/*                                .state_bytes = sizeof(login_error_update) */
-/*     }; */
-/*     memcpy(pos, &h, sizeof(h)); */
-/*     pos += sizeof(h); */
-/*     memcpy(pos,login_error_update, sizeof(login_error_update)); */
-/*     pos += sizeof(login_error_update); */
-/*     *respbufsz = (size_t)(pos - respbuf); */
-/* } */
+/* -------------------- LOGIN SCREEN --------------------- */
 
-struct screen {
+#define LOGIN_SCREEN_FIELDS                                             \
+    LABEL(0,  9,  8, 27, "USER . . . . . . . . . . . ")                 \
+    LABEL(1,  9, 10, 27, "PASSWORD . . . . . . . . . ")                 \
+    INPUT(2, 38,  8, 24)                                                \
+    INPUT(3, 38, 10, 24)                                                \
+    LABEL_F(4,  5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
+    LABEL(5, 40,  1, 19, "Marina 59 | Sign On")                         \
+    STATUS(6, 38, 14, 17, "Sorry, try again.", HIDDEN, RED)
+
+#define X(id, t, xx, yy, w, txt, len, flg, col)                         \
+    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
+    struct field_layout login_screen_layout[] = {
+        LOGIN_SCREEN_FIELDS 
+    };
+#undef X
+
+#define X(id, t, x, y, w, txt, len, flg, col)               \
+    { .field_id = (id), .text = (txt), .text_len = (len),   \
+            .fg_color = (col), .flags = (flg) },
+    struct field_state login_screen_state[] = {
+        LOGIN_SCREEN_FIELDS
+    }; 
+#undef X
+
+
+/* --------------------------------------------END LOGIN SCREENS ---------------------------------------------- */
+/* -------------------------------------------- MAIN SCREEN START --------------------------------------------- */
+/*   id, col, row, width */
+#define MAIN_SCREEN_FIELDS                          \
+    LABEL(0,7,1,8, "DSP_USER")                      \
+    LABEL(1,67,1,8, "DSP_DATE")                     \
+    LABEL(2,67,1,8, "DSP_TIME")                     \
+    INPUT(3,6,24,1)                                 \
+    LABEL(4,29,1,21, "Marina Access Control")       \
+    LABEL(5,35,2,9, "MAIN MENU")                    \
+    LABEL(6,6,6,28, "Select one of the following:") \
+    LABEL(7,10,8,15,   "1. Add customer")           \
+    LABEL(8,10,9,17,   "2. View customers")         \
+    LABEL(9,10,10,17,  "3. Access history")         \
+    LABEL(10,10,11,15,  "4. Live montior")          \
+    LABEL(11,1,23,9,"Selection")                    \
+    LABEL(12,1,24,4, "===>")                        \
+    HL(13,1,26,100)                                 \
+    LABEL(14,6,28,9,"F6=Logout")                    \
+    LABEL(15,19,28,9, "F7=Search")                  \
+    LABEL(16,31,28,16,"F8=Redraw screen")           \
+    HL(17,0,29,100)
+
+#define X(id, t, xx, yy, w, txt, len, flg, col)                         \
+    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
+    struct field_layout main_screen_layout[] = {
+        MAIN_SCREEN_FIELDS 
+    };
+#undef X
+
+#define X(id, t, x, y, w, txt, len, flg, col)               \
+    { .field_id = (id), .text = (txt), .text_len = (len),   \
+            .fg_color = (col), .flags = (flg) },
+    struct field_state main_screen_state[] = {
+        MAIN_SCREEN_FIELDS
+    }; 
+#undef X
+
+
+
+/* -------------------------------------------- MAIN SCREEN END --------------------------------------------- */
+
+
+struct net_payload_screen {
     int id;
     u8 *buf;
     size_t len;
 };
 
-struct screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB) {
+struct net_payload_screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB) {
     int is_new = 0;
     if (opA == OP_A_NEW)  {
         is_new = 1;
@@ -88,7 +144,7 @@ struct screen serialize_screen(struct field_state *fs, struct field_layout *fl, 
                                .state_bytes =  state_bytes
     };
     
-    struct screen scr = {
+    struct net_payload_screen scr = {
         .id = 1,
         .buf = malloc(total_bytes),
         .len = total_bytes
@@ -110,31 +166,7 @@ struct screen serialize_screen(struct field_state *fs, struct field_layout *fl, 
     return scr;
 }
 
-#define LOGIN_SCREEN_FIELDS                             \
-    LABEL(0,  9,  8, 27, "USER . . . . . . . . . . . ") \
-    LABEL(1,  9, 10, 27, "PASSWORD . . . . . . . . . ") \
-    INPUT(2, 38,  8, 24) \
-    INPUT(3, 38, 10, 24) \
-    LABEL_F(4,  5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
-    LABEL(5, 40,  1, 19, "Marina 59 | Sign On") \
-    STATUS(6, 38, 14, 17, "Sorry, try again.", HIDDEN, RED)
-
-#define X(id, t, xx, yy, w, txt, len, flg, col)                         \
-    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
-    struct field_layout login_screen_layout[] = {
-        LOGIN_SCREEN_FIELDS 
-    };
-#undef X
-
-#define X(id, t, x, y, w, txt, len, flg, col)               \
-    { .field_id = (id), .text = (txt), .text_len = (len),   \
-            .fg_color = (col), .flags = (flg) },
-    struct field_state login_screen_state[] = {
-        LOGIN_SCREEN_FIELDS
-    }; 
-#undef X
-
-struct sc {
+struct screen {
     u8 op_A;
     u8 op_B;
     size_t nFields;
@@ -142,78 +174,66 @@ struct sc {
     struct field_state *state;
 };
 
-#define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
-
-#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr)    \
-    {       .op_A = (opA),                                  \
-            .op_B = (opB),                                  \
-            .layout = (layout_arr),                         \
-            .state = (state_arr),                           \
-            .nFields = MAX_SLOTS(state_arr)              \
-            }
-
-struct sc screens[] = {
-    [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state)
+/* |--------------------------------------- ALL SCREEN DEFINTIONNS HERE -------------------------------- */
+struct screen screens[] = {
+    [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state),
+    [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state)
 };
+
 
 
 
 /* ---------------------------- state management ------------------------------------------------------------------- */
 
-struct who_is_where {
+struct world_state {
     u64 conn_id;
-
-    enum where_you_at wya;
-    enum permissions p;
+    u8 cur_scr;
+    u8 p;
     UT_hash_handle hh;
 };
 
-struct who_is_where *users = NULL;
+struct world_state *players = NULL;
 
+/* ----------------------------- Business Rules ------------------------------------------------------------------- */
 int verify_login_credentials(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
     // extract user  
     // extract pw 
     // verify user and pw
     // retunr ok, bad_user, bad_pass. 
 
-    /* send an array of state structs of only the fields you want to change add hide and unhide */
-    
     return 1;
 }
 
-/* respbuf is created in mongoose portion, that we fill in to
- send back out over the wire.*/
-struct screen big_fucking_business(u64 conn_id, u8 *reqbuf, int reqbuflen) {
-    struct who_is_where *wiw = NULL;
-    HASH_FIND_INT(users,&conn_id,wiw);
-    if (!wiw) {
-        struct who_is_where *wiw = malloc(sizeof(*wiw));
-        wiw->conn_id = conn_id;
-        wiw->wya = SCR_LOGIN;
-        HASH_ADD_INT(users, conn_id, wiw);
-        struct sc scr = screens[SCR_LOGIN];
-        return serialize_screen(scr.state, scr.layout, scr.nFields, scr.op_A, scr.op_B);
+
+struct screen dispatch_business_logic(u64 conn_id, u8 *reqbuf, int reqbuflen) {
+
+    struct world_state *player = NULL;
+    HASH_FIND_INT(players,&conn_id, player);
+
+    if (!player) {
+        struct world_state *player = malloc(sizeof(*player));
+        player->conn_id = conn_id;
+        player->cur_scr = SCR_LOGIN;
+        HASH_ADD_INT(players, conn_id, player);
+        return screens[SCR_LOGIN];
+
     } else {
-        switch(wiw->wya) {
+        switch(player->cur_scr) {
         case SCR_LOGIN:
-            printf("LOGIN");
-
-            //if login verified
-            // int res = verify_login_credentials(reqbuf, reqbuflen);
-            wiw->wya = SCR_MAIN;
+            //player submitting credentials here.
+            //if credential are bad return login
+            return screens[SCR_MAIN];
+            // else update player screenn and return main
+            player->cur_scr = SCR_MAIN;
             break;
-
         case SCR_MAIN:
-            printf("MAIN");
             break;
         }
-        // render new screen based on state 
-
-    }
+     }
 }
 
 /* ===========================================================================
-       The MONGOOSE SHIT HERE, someone clean it up.
+       The MONGOOSE HERE
    =========================================================================== */
 
 void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
@@ -232,8 +252,14 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         {
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
-              struct screen scr = big_fucking_business(c->id, (u8*)wm->data.buf, wm->data.len);
-              mg_ws_send(c, scr.buf,scr.len, WEBSOCKET_OP_BINARY);
+              struct screen nxt_scr = dispatch_business_logic(c->id, (u8*)wm->data.buf, wm->data.len);
+              struct net_payload_screen payload = serialize_screen(nxt_scr.state, 
+                                                                  nxt_scr.layout, 
+                                                                  nxt_scr.nFields, 
+                                                                  nxt_scr.op_A, 
+                                                                  nxt_scr.op_B);
+              
+              mg_ws_send(c, payload.buf,payload.len, WEBSOCKET_OP_BINARY);
             }
         }
     }

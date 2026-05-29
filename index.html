@@ -192,8 +192,8 @@
          };
 
          const defColorsGlobal = {
-             bg: COLORS.BLACK,
-             fg: COLORS.AMBER
+             bg: COLORS.WHITE,
+             fg: COLORS.BLACK
          };
 
          document.body.style.setProperty('--theme-bg', defColorsGlobal.bg);
@@ -227,10 +227,15 @@
              for (let i = 0; i < MAX_SLOTS; i++) {
                  const handle = SLOT_POOL[i];
                  handle.isDirty = false;
-                 /* handle.style.display = 'none';
-                  * handle.classList.remove('label', 'hline');
-                  * handle.oninput = null;
-                  * handle.tabIndex = -1; */
+                 handle.disabled = true;
+                 handle.classList.remove('label', 'hline');
+                 handle.oninput = null;
+                 handle.tabIndex = -1;
+                 handle.value = "";
+                 handle.style.setProperty('--row', 0);
+                 handle.style.setProperty('--col', 0);
+                 handle.style.setProperty('--width', 0);
+                 handle.toggleAttribute('data-hidden',true);
              }
          }
                           
