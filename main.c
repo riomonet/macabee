@@ -275,17 +275,24 @@ void render_login_warning(struct player *player) {
     scr.op_A = OP_A_UPDATE;
     scr.op_B = OP_B_DEF;
     scr.ic = LOGIN_IUSER;
-    scr.nFields =  1;
+    scr.nFields =  2;
+    struct field_state buf[2];
 
     struct field_state f = login_screen_state[LOGIN_WARNING];
     f.fg_color = RED;
     f.flags &= ~HIDDEN;
     f.flags &= BLINK;
-
     strcpy(f.text, "HOLY SHIT BATMAN!");
     f.text_len = strlen(f.text);
 
-    scr.state = &f;
+    struct field_state g = login_screen_state[LOGIN_IUSER];
+    g.fg_color = BLUE;
+    strcpy(g.text, "Pussy Galore?" );
+    g.text_len = strlen(g.text);
+
+    buf[0] = f;
+    buf[1] = g;
+    scr.state = buf;
     mb_send(player,&scr);
 }
 
