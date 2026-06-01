@@ -279,17 +279,20 @@ void render_login_warning(struct player *player) {
     scr.nFields =  1;
     struct field_state f = login_screen_state[LOGIN_WARNING];
     f.fg_color = RED;
-    strcpy(f.text, "HOLY SHIT BATMAN!");
+    memcpy(f.text, "HOLY SHIT BATMAN!",10);
+    f.text[9] = 0;
+    printf("%s\n",f.text);
+    f.text_len = 10;
     f.flags &= ~HIDDEN;
+    scr.state = &f;
+    mb_send(player,&scr);
 }
 
 void render_screen_template(struct player *player, u8 SCREEN) {
     mb_send(player, &screens[SCREEN]);    
 }
 
-
 /* ----------------------------- Business Rules ------------------------------------------------------------------- */
-
 
 /* Returns 0 on failure and 1 on success */
 int verify_login_credentials(char *user, char *pw) {
@@ -311,7 +314,7 @@ int try_login(struct player *player, char *user, char *pw) {
                 return uid;
             } else {
                 player->auth.attempts++;
-                if (player->auth.attempts >= 3) {
+                if (player->auth.attempts >= 40) {
                     player->auth.locked_until = time(NULL) + 3; /* 3 second timeout */
                 } 
                 render_login_warning(player);

@@ -317,11 +317,66 @@
 	         this.isDirty = true;
          }
 
-         function sys_update_terminal(view) {
-             
+          function sys_update_terminal(view) {
+              console.log('updateing');
+             const decoder          = new TextDecoder('utf-8');
+             const headerSize       = 8;
+             const opcodeB          = view.getUint8(1);
+             const fieldCount       = view.getUint8(2);
+             const reserved         = view.getUint8(3);
+             const layoutBytesSz    = view.getUint16(4,true);
+             const stateBytesSz     = view.getUint16(6,true);
+             const stateBase        = headerSize;
+
+             const state_struct     = 48;
+             const IC               = reserved; /* Initial cursor flag */
+             for (let i             = 0; i < fieldCount; i++) {
+                 const stateOffset  = stateBase + (i * state_struct);
+                 const stateId   = view.getUint8(stateOffset + 0);
+                 const handle = SLOT_POOL[stateId];
+                 const flags     = view.getUint8(stateOffset + 1);
+                 const fgColor   = view.getUint8(stateOffset + 2);
+                 const bgColor   = view.getUint8(stateOffset + 3);
+                 const textLen   = view.getUint8(stateOffset + 4);
+                 const stateR1   = view.getUint8(stateOffset + 5);
+                 const stateR2   = view.getUint8(stateOffset + 6);
+                 const stateR3   = view.getUint8(stateOffset + 7);
+                 const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
+                 
+                 handle.state.id = stateId;
+                 handle.state.flags = flags
+                 handle.state.fgColor = fgColor;
+                 handle.state.bgColor = bgColor;
+                 handle.state.len = textLen;
+                 console.log("doody");
+                 console.log('value =', handle.value);
+                 
+		         handle.value = decoder.decode(textBytes);
+
+                 handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); //
+                 handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
+                 handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
+                 handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
+                 handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
+
+                 handle.setAttribute('data-fg', handle.state.fgColor);
+                 handle.setAttribute('data-bg', handle.state.bgColor);
+
+                 if (handle.state.flags & DSP.INVERSE) {
+                     handle.state.inverse = true;
+                     handle.setAttribute('data-fg', (handle.state.bgColor || defColors.bg));
+                     handle.setAttribute('data-bg', (handle.state.fgColor || defColors.fg));
+                 } else {
+                     if (handle.state.inverse) {
+                         handle.state.inverse = false;
+                         handle.setAttribute('data-fg', (handle.state.fgColor || defColors.fg));
+                         handle.setAttribute('data-bg', (handle.state.bgColor || defColors.bg));
+                     }
+                 }
+             }
          }
 
-         function sys_render_terminal(view) {
+             function sys_render_terminal(view) {
 
 	         const decoder          = new TextDecoder('utf-8');
              const headerSize       = 8;
