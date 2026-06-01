@@ -277,9 +277,10 @@ void render_login_warning(struct player *player) {
     scr.op_B = OP_B_DEF;
     scr.ic = LOGIN_IUSER;
     scr.nFields =  1;
-    //    scr.state
-    //    struct field_state f;
-    //f = login_screen_state[LOGIN_WARNING];
+    struct field_state f = login_screen_state[LOGIN_WARNING];
+    f.fg_color = RED;
+    strcpy(f.text, "HOLY SHIT BATMAN!");
+    f.flags &= ~HIDDEN;
 }
 
 void render_screen_template(struct player *player, u8 SCREEN) {
@@ -300,7 +301,7 @@ int get_permissions(u16 uid) {
 }
 
 int try_login(struct player *player, char *user, char *pw) {
-        LOCKED:
+
             if (time(NULL) < player->auth.locked_until) {
                 render_login_warning(player);
                 return 0;
@@ -312,7 +313,6 @@ int try_login(struct player *player, char *user, char *pw) {
                 player->auth.attempts++;
                 if (player->auth.attempts >= 3) {
                     player->auth.locked_until = time(NULL) + 3; /* 3 second timeout */
-                    goto LOCKED;
                 } 
                 render_login_warning(player);
                 return 0;
