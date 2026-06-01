@@ -31,15 +31,15 @@ struct __attribute__((packed)) packet_header {
     u8 opcode_b;
     u8 num_fields;
     u8 reserved;
-    u16 layout_bytes;
-    u16 state_bytes;
+    u16 layout_bytes;           /* Num bytes in array */
+    u16 state_bytes;            /* Num bytes in array */
 };
 
 
 // Immutable 1 for each field
 struct __attribute__((packed)) field_layout {
     u8 field_id;
-    u8 type; // (label | input)
+    u8 type;                    /* Widget type */
     u8 x;
     u8 y;
     u8 width;

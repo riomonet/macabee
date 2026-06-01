@@ -31,8 +31,8 @@
 #define LABEL_CF(id, xx, yy, ww, txt, flg, col) \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col)
 
-#define STATUS(id, xx, yy, ww, txt, flg, col) \
-    LABEL_CF(id, xx, yy, ww, txt, flg, col)
+#define STATUS(id, xx, yy, ww, txt, flg) \
+    LABEL_F(id, xx, yy, ww, txt, flg)
 
 #define STATE(id, txt, flg, col) \
     X(id, txt, sizeof(txt)-1, flg, col)
@@ -53,15 +53,15 @@
 
 /* -------------------- LOGIN SCREEN --------------------- */
 
-#define LOGIN_SCREEN_FIELDS                                             \
-    LABEL(LOGIN_L1,  9,  8, 27, "USER . . . . . . . . . . . ")  \
-        LABEL(LOGIN_L2,  9, 10, 27, "PASSWORD . . . . . . . . . ") \
-        INPUT(LOGIN_IUSER, 38,  8, 24)                             \
-        INPUT(LOGIN_IPW,38, 10, 24)                                \
-        LABEL_F(LOGIN_L3,5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
-        LABEL(LOGIN_L4, 40,  1, 19, "Marina 59 | Sign On")           \
-        STATUS(LOGIN_L5,38, 14, 17, "Sorry, try again.", HIDDEN, RED)
 
+#define LOGIN_SCREEN_FIELDS                                             \
+    LABEL(LOGIN_L1,  9,  8, 27, "USER . . . . . . . . . . . ")          \
+        LABEL(LOGIN_L2,  9, 10, 27, "PASSWORD . . . . . . . . . ")      \
+        INPUT(LOGIN_IUSER, 38,  8, 24)                                  \
+        INPUT(LOGIN_IPW,38, 10, 24)                                     \
+        LABEL_F(LOGIN_L3,5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
+        LABEL(LOGIN_L4, 40,  1, 19, "Marina 59 | Sign On")              \
+        STATUS(LOGIN_WARNING,38, 14, 17, "", HIDDEN) \
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum LOGIN_SCR_IDX {
@@ -104,11 +104,11 @@ enum LOGIN_SCR_IDX {
     LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
     LABEL(MAIN_L11,1,23,9,"Selection")                          \
     LABEL(MAIN_L12,1,24,4, "===>")                              \
-    HL(MAIN_L13,1,26,100)                                       \
+    HL(MAIN_HL1,1,26,100)                                       \
     LABEL(MAIN_L14,6,28,9,"F6=Logout")                          \
     LABEL(MAIN_L15,19,28,9, "F7=Search")                        \
     LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")                 \
-    HL(MAIN_L17,0,29,100)                                      \
+    HL(MAIN_HL2,0,29,100)                                      \
     HL(MAIN_HL3,7,24,90)                                     
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
@@ -142,13 +142,12 @@ struct net_payload_screen {
     size_t len;
 };
 
-struct net_payload_screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB, u8 ic) {
+struct net_payload_screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB, u8 ic, u8 *buf) {
     int is_new = 0;
     if (opA == OP_A_NEW)  {
         is_new = 1;
     }
 
-        
     size_t layout_bytes = (is_new * num_fields) * sizeof(struct field_layout);
     size_t state_bytes =  num_fields * sizeof(struct field_state);
     size_t total_bytes = layout_bytes  + state_bytes + sizeof(struct packet_header);
@@ -157,17 +156,23 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
                                .opcode_b = opB,
                                .num_fields = num_fields,
                                .reserved = ic,
-                               .layout_bytes = layout_bytes,
+                               .layout_bytes = layout_bytes, /* u16, Num bytes in each array. */
                                .state_bytes =  state_bytes
     };
     
-    struct net_payload_screen scr = {
+    /* struct net_payload_screen netscr = { */
+    /*     .id = 1, */
+    /*     .buf = malloc(total_bytes), */
+    /*     .len = total_bytes */
+    /* }; */
+
+    struct net_payload_screen netscr = {
         .id = 1,
-        .buf = malloc(total_bytes),
+        .buf = buf,
         .len = total_bytes
     };
 
-    u8 *pos = scr.buf;
+    u8 *pos = netscr.buf;
 
     memcpy(pos, &h, sizeof(h));
     pos += sizeof(h);
@@ -180,7 +185,7 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
     memcpy(pos,fs, state_bytes);
     pos += state_bytes;
 
-    return scr;
+    return netscr;
 }
 
 struct screen {
@@ -192,60 +197,162 @@ struct screen {
     struct field_state *state;
 };
 
-/* |--------------------------------------- ALL SCREEN DEFINTIONNS HERE -------------------------------- */
+
+/* |--------------------------------------- GLOBAL SCREEN TEMPLATES -------------------------------- */
+
+/* Global Screen templates:  */
 struct screen screens[] = {
     [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state,LOGIN_IUSER),
     [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
 };
 
+/* ---------------------------- World state management ------------------------------------ */
 
-/* ---------------------------- state management ------------------------------------------------------------------- */
 
-struct world_state {
-    u64 conn_id;
-    u8 cur_scr;
-    u8 p;
+
+struct player {
+    struct mg_connection *c;
     UT_hash_handle hh;
+    u8 scrid;
+    struct auth {
+        time_t logintim;
+        u8 attempts;
+        u8 permissions;
+        u16 uid;
+        char uname[24];
+        time_t locked_until;
+    } auth;
 };
 
-struct world_state *players = NULL;
+/* 'players' is a pointer to a global hash table.  It is 
+ * a container of 'player' who have connected. They are either 
+ * in an authorized or unauthorized state. */
+struct player *players = NULL;
 
-/* ----------------------------- Business Rules ------------------------------------------------------------------- */
-int verify_login_credentials(u8 *reqbuf, int reqbuflen, u8 *respbuf, size_t *respbufsz) {
-    // extract user  
-    // extract pw 
-    // verify user and pw
-    // retunr ok, bad_user, bad_pass. 
 
-    return 1;
+/* Add a new player to the world. The player will start in
+ * an unauthenticated state on 'SCR_LOGIN'. */
+struct player *onboard_new_player(struct mg_connection *c) {
+    struct player *player = (struct player*) malloc(sizeof(*player));
+    player->c = c;
+    player->scrid = SCR_LOGIN;
+    player->auth.uname[0] = '\0';
+    player->auth.uid = 0;            /* Unitialized */
+    player->auth.attempts = 0;
+    player->auth.locked_until = 0;
+    HASH_ADD_PTR(players, c, player);
+    return player;
+}
+
+/* Wrapper around mg_ws_send */
+void mb_send (struct player *player, struct screen *scr) {
+    u8 buffer[4096];
+    struct net_payload_screen payload = serialize_screen(scr->state,
+                                                         scr->layout,
+                                                         scr->nFields,
+                                                         scr->op_A,
+                                                         scr->op_B,
+                                                         scr->ic,
+                                                         buffer
+                                                         );
+
+    mg_ws_send(player->c, payload.buf, payload.len, WEBSOCKET_OP_BINARY);
+}
+
+void init_authenticated_player(struct player *player, u16 uid, char *username) {
+    player->auth.logintim = time(NULL);
+    //    player->auth.permissions = get_permissions(uid);
+    player->auth.uid = uid;
+    strcpy(player->auth.uname, username);
+    player->auth.attempts = 0;
+    player->auth.locked_until = 0;
 }
 
 
-struct screen dispatch_business_logic(u64 conn_id, u8 *reqbuf, int reqbuflen) {
+/* ----------------------------- Render functions ------------------------------------------------------------------- */
 
-    struct world_state *player = NULL;
-    HASH_FIND_INT(players,&conn_id, player);
+void render_login_warning(struct player *player) {
+    struct screen scr;
+    scr.op_A = OP_A_UPDATE;
+    scr.op_B = OP_B_DEF;
+    scr.ic = LOGIN_IUSER;
+    scr.nFields =  1;
+    //    scr.state
+    //    struct field_state f;
+    //f = login_screen_state[LOGIN_WARNING];
+}
 
-    if (!player) {
-        struct world_state *player = malloc(sizeof(*player));
-        player->conn_id = conn_id;
-        player->cur_scr = SCR_LOGIN;
-        HASH_ADD_INT(players, conn_id, player);
-        return screens[SCR_LOGIN];
+void render_screen_template(struct player *player, u8 SCREEN) {
+    mb_send(player, &screens[SCREEN]);    
+}
 
+
+/* ----------------------------- Business Rules ------------------------------------------------------------------- */
+
+
+/* Returns 0 on failure and 1 on success */
+int verify_login_credentials(char *user, char *pw) {
+    return 0;
+}
+
+int get_permissions(u16 uid) {
+    return 1;
+}
+
+int try_login(struct player *player, char *user, char *pw) {
+        LOCKED:
+            if (time(NULL) < player->auth.locked_until) {
+                render_login_warning(player);
+                return 0;
+            }
+            u16 uid;
+            if ((uid = verify_login_credentials("ari","safari")) > 0) {
+                return uid;
+            } else {
+                player->auth.attempts++;
+                if (player->auth.attempts >= 3) {
+                    player->auth.locked_until = time(NULL) + 3; /* 3 second timeout */
+                    goto LOCKED;
+                } 
+                render_login_warning(player);
+                return 0;
+            }
+}
+
+/* Dispatch Business Logic */
+struct screen *dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
+
+    struct player *player = NULL;
+    HASH_FIND_PTR(players,&c, player);
+
+    if (!player) {              
+        /* Player is not yet added to the world. 
+         * add player to the world and send initial screen. */
+        player = onboard_new_player(c);
+        render_screen_template(player, SCR_LOGIN);
+        
     } else {
-        switch(player->cur_scr) {
-        case SCR_LOGIN:
-            //player submitting credentials here.
-            //if credential are bad return login
-            return screens[SCR_MAIN];
-            // else update player screenn and return main
-            player->cur_scr = SCR_MAIN;
-            break;
+        
+        switch(player->scrid) {        /* Player is in the world. dispatch based on screen state.*/
+
+        case SCR_LOGIN:         
+            {
+                char *uname,*pw;
+                struct screen scr;
+                int uid = try_login(player, uname, pw);
+                if (uid) {
+                    init_authenticated_player(player, uid, uname);
+                    render_screen_template(player, SCR_MAIN);
+                }
+            } break;
+            
         case SCR_MAIN:
-            break;
+            {
+                /* Get aid key and deploy screen */
+                render_screen_template(player, SCR_MAIN);
+            } break;
         }
-     }
+    }
 }
 
 /* ===========================================================================
@@ -268,16 +375,17 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         {
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
-              struct screen nxt_scr = dispatch_business_logic(c->id, (u8*)wm->data.buf, wm->data.len);
-              struct net_payload_screen payload = serialize_screen(nxt_scr.state, 
-                                                                   nxt_scr.layout, 
-                                                                   nxt_scr.nFields, 
-                                                                  nxt_scr.op_A, 
-                                                                   nxt_scr.op_B,
-                                                                   nxt_scr.ic
-                                                                   );
+                dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); 
+              /* struct screen nxt_scr = dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); */
+              /* struct net_payload_screen payload = serialize_screen(nxt_scr.state,  */
+              /*                                                      nxt_scr.layout,  */
+              /*                                                      nxt_scr.nFields,  */
+              /*                                                      nxt_scr.op_A,  */
+              /*                                                      nxt_scr.op_B, */
+              /*                                                      nxt_scr.ic */
+              /*                                                      ); */
               
-              mg_ws_send(c, payload.buf,payload.len, WEBSOCKET_OP_BINARY);
+              /* mg_ws_send(c, payload.buf,payload.len, WEBSOCKET_OP_BINARY); */
             }
         }
     }
@@ -366,4 +474,4 @@ update screen
 /* struct field_state main_menu_state[] = { MAIN_MENU_FIELDS }; */
 /* #undef X */
 
-
+/* Account locked. Try again in 3 seconds. */
