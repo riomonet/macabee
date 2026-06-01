@@ -270,20 +270,21 @@ void init_authenticated_player(struct player *player, u16 uid, char *username) {
 
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
-
 void render_login_warning(struct player *player) {
     struct screen scr;
     scr.op_A = OP_A_UPDATE;
     scr.op_B = OP_B_DEF;
     scr.ic = LOGIN_IUSER;
     scr.nFields =  1;
+
     struct field_state f = login_screen_state[LOGIN_WARNING];
     f.fg_color = RED;
-    memcpy(f.text, "HOLY SHIT BATMAN!",10);
-    f.text[9] = 0;
-    printf("%s\n",f.text);
-    f.text_len = 10;
     f.flags &= ~HIDDEN;
+    f.flags &= BLINK;
+
+    strcpy(f.text, "HOLY SHIT BATMAN!");
+    f.text_len = strlen(f.text);
+
     scr.state = &f;
     mb_send(player,&scr);
 }
