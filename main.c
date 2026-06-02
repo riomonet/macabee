@@ -19,6 +19,9 @@
 #define INPUT(id, xx, yy, ww)                  \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0)
 
+#define INPUT_F(id, xx, yy, ww,flg)                  \
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0)
+
 #define HL(id, xx, yy, ww)                      \
     X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0)
 
@@ -53,15 +56,15 @@
 
 /* -------------------- LOGIN SCREEN --------------------- */
 
-
-#define LOGIN_SCREEN_FIELDS                                             \
-    LABEL(LOGIN_L1,  9,  8, 27, "USER . . . . . . . . . . . ")          \
-        LABEL(LOGIN_L2,  9, 10, 27, "PASSWORD . . . . . . . . . ")      \
-        INPUT(LOGIN_IUSER, 38,  8, 24)                                  \
-        INPUT(LOGIN_IPW,38, 10, 24)                                     \
-        LABEL_F(LOGIN_L3,5,  5, 37, "Tab to change fields, Enter to submit", FAINT) \
-        LABEL(LOGIN_L4, 40,  1, 19, "Marina 59 | Sign On")              \
-        STATUS(LOGIN_WARNING,38, 14, 17, "", HIDDEN) \
+/* col, row */
+#define LOGIN_SCREEN_FIELDS                                                     \
+    LABEL(LOGIN_L1           , 9,   8, 27,     "USER . . . . . . . . . . . ") \
+        LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ") \
+        INPUT(LOGIN_IUSER    , 38,  8, 24)                              \
+        INPUT_F(LOGIN_IPW    , 38, 10, 24,PASSWORD)                     \
+        LABEL_CF(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT,CYAN) \
+        LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE) \
+        STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)                   \
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum LOGIN_SCR_IDX {
@@ -160,12 +163,6 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
                                .state_bytes =  state_bytes
     };
     
-    /* struct net_payload_screen netscr = { */
-    /*     .id = 1, */
-    /*     .buf = malloc(total_bytes), */
-    /*     .len = total_bytes */
-    /* }; */
-
     struct net_payload_screen netscr = {
         .id = 1,
         .buf = buf,
@@ -209,7 +206,6 @@ struct screen screens[] = {
 /* ---------------------------- World state management ------------------------------------ */
 
 
-
 struct player {
     struct mg_connection *c;
     UT_hash_handle hh;
@@ -219,7 +215,7 @@ struct player {
         u8 attempts;
         u8 permissions;
         u16 uid;
-        char uname[24];
+        char uname[25];
         time_t locked_until;
     } auth;
 };
@@ -266,32 +262,28 @@ void init_authenticated_player(struct player *player, u16 uid, char *username) {
     strcpy(player->auth.uname, username);
     player->auth.attempts = 0;
     player->auth.locked_until = 0;
+    player->scrid = SCR_MAIN;
 }
 
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
 void render_login_warning(struct player *player) {
     struct screen scr;
+    struct field_state buf[1];
+    
     scr.op_A = OP_A_UPDATE;
     scr.op_B = OP_B_DEF;
     scr.ic = LOGIN_IUSER;
-    scr.nFields =  2;
-    struct field_state buf[2];
-
+    scr.nFields = MAX_SLOTS(buf);
+        
     struct field_state f = login_screen_state[LOGIN_WARNING];
     f.fg_color = RED;
+    f.bg_color = GREEN;
     f.flags &= ~HIDDEN;
-    f.flags &= BLINK;
-    strcpy(f.text, "HOLY SHIT BATMAN!");
+    strcpy(f.text,"Sorry, try again." );
     f.text_len = strlen(f.text);
-
-    struct field_state g = login_screen_state[LOGIN_IUSER];
-    g.fg_color = BLUE;
-    strcpy(g.text, "Pussy Galore?" );
-    g.text_len = strlen(g.text);
-
+    
     buf[0] = f;
-    buf[1] = g;
     scr.state = buf;
     mb_send(player,&scr);
 }
@@ -304,6 +296,10 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 
 /* Returns 0 on failure and 1 on success */
 int verify_login_credentials(char *user, char *pw) {
+    if ((strcmp(user, "Marvin") == 0) &&
+        (strcmp(pw  , "Buncher") == 0)) {
+            return 99;
+        }
     return 0;
 }
 
@@ -318,7 +314,7 @@ int try_login(struct player *player, char *user, char *pw) {
                 return 0;
             }
             u16 uid;
-            if ((uid = verify_login_credentials("ari","safari")) > 0) {
+            if ((uid = verify_login_credentials(user,pw)) > 0) {
                 return uid;
             } else {
                 player->auth.attempts++;
@@ -330,9 +326,50 @@ int try_login(struct player *player, char *user, char *pw) {
             }
 }
 
-/* Dispatch Business Logic */
-struct screen *dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
 
+/*  ======================================================================================
+  
+                            CLIENT MESSAGE PROCESSING DEPT
+                            
+    ===================================================================================== */
+
+/* ------------------ CLIENT to SERVER MESSAGE FORMAT   ---------------------------
+                           | -------- | -------- | --------
+         Header:           | opcode   |  aidkey  | nFields  |
+
+                            | -------- | -------- | ------------------------|
+         Field blocks:     | field_id  |  fldlen  |      field_val 24       |
+         
+---------------------------------------------------------------------------------------*/
+/* client req header item */
+struct __attribute__((packed)) cfh {
+    u8 opcode;
+    u8 AID;
+    u8 nFields;
+};
+
+/* client req field block field item */
+struct __attribute__((packed)) cfb {
+    u8 id;
+    u8 len;
+    char val[24];
+};
+
+void extract_login_creds(char *uname, char *pw, u8 *reqbuf) {
+    u8 *p = reqbuf;
+    if (p[2] < 2) return;
+    p += sizeof(struct cfh);
+    
+    struct cfb *user = (struct cfb*) p;
+    struct cfb *pass = (struct cfb*) (p + sizeof(*user));
+    
+    memcpy(uname, user->val,user->len);
+    memcpy(pw, pass->val, pass->len);
+}
+    
+/* Dispatch Business Logic */
+void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
+    
     struct player *player = NULL;
     HASH_FIND_PTR(players,&c, player);
 
@@ -345,13 +382,13 @@ struct screen *dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int 
     } else {
         
         switch(player->scrid) {        /* Player is in the world. dispatch based on screen state.*/
-
         case SCR_LOGIN:         
             {
-                char *uname,*pw;
-                struct screen scr;
+                char uname[25] = {0}, pw[25] = {0};
+                extract_login_creds(uname, pw, reqbuf);
                 int uid = try_login(player, uname, pw);
                 if (uid) {
+                    printf("uid Success: %d",uid);
                     init_authenticated_player(player, uid, uname);
                     render_screen_template(player, SCR_MAIN);
                 }
@@ -360,6 +397,7 @@ struct screen *dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int 
         case SCR_MAIN:
             {
                 /* Get aid key and deploy screen */
+                printf("IN SCRMAIN\n");
                 render_screen_template(player, SCR_MAIN);
             } break;
         }
@@ -387,16 +425,6 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
                 dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); 
-              /* struct screen nxt_scr = dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); */
-              /* struct net_payload_screen payload = serialize_screen(nxt_scr.state,  */
-              /*                                                      nxt_scr.layout,  */
-              /*                                                      nxt_scr.nFields,  */
-              /*                                                      nxt_scr.op_A,  */
-              /*                                                      nxt_scr.op_B, */
-              /*                                                      nxt_scr.ic */
-              /*                                                      ); */
-              
-              /* mg_ws_send(c, payload.buf,payload.len, WEBSOCKET_OP_BINARY); */
             }
         }
     }

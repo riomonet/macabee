@@ -1,6 +1,5 @@
 #ifndef MAC_TYPES_INCLUDED
 #define MAC_TYPES_INCLUDED
-
 #include <stdint.h>
 
 typedef uint8_t u8;
@@ -16,7 +15,7 @@ typedef uint64_t u64;
 #define VIS_INPUT 1 << 0
 #define VIS_LABEL 1 << 1
 #define VIS_LINE  1 << 2
-#define MAX_FLD_SIZE 40
+#define MAX_FLD_SIZE 120
 
 struct __attribute__((packed)) update_header {
     u8 opcode_a;
@@ -24,7 +23,7 @@ struct __attribute__((packed)) update_header {
     u8 num_fields;
     u8 reserved;
     u16 state_bytes;
-};
+};                              
 
 struct __attribute__((packed)) packet_header {
     u8 opcode_a;
@@ -69,9 +68,8 @@ enum permissions {
     ADMIN, CUSTOMER
 };
 
-
 enum colors {
-    BLACK,
+    DEFAULT,
     RED,
     GREEN,
     BROWN,
@@ -79,7 +77,8 @@ enum colors {
     MAGENTA,
     CYAN,
     WHITE,
-    AMBER
+    AMBER,
+    BLACK
 };
 
 enum DSP {
