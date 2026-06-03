@@ -435,18 +435,17 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 /* ===============================DATABASE====================================================== */
-/* create table */
-/* insert into table */
+
+
+/* ---------------- SQL DSL FOR INITIALIZING DB and CREATING TABLES --------------------------- */
+
+#define DEV_MODE 1
+sqlite3 *db;
 
 #define SQLITE_JOURNAL_MODE wal
 #define SQLITE_SYNC normal
 #define SQLITE_FOREIGN_KEYS on
 #define SQLITE_SET_PRAGMA(mode,val) sqlite3_exec(db,"PRAGMA " #mode "=" STR(val), NULL, NULL, NULL)
-
-
-sqlite3 *db;
-/* zz */
-
 
 #define x20 " "
 #define COMMA ","
@@ -463,8 +462,21 @@ sqlite3 *db;
 #define	TBC_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")" COMMA
 #define	TBCL_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")"
 
+#ifdef DEV_MODE
+#define CREAT_TBL(db, name, tbl)					\
+    do {								\
+	sqlite3_exec(db, "DROP TABLE IF EXISTS"        x20 #name ";"          ,NULL, NULL, NULL); \
+	sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS"  x20 #name "(" tbl ");" ,NULL, NULL, NULL); \
+    } while(0)							       
 
+#else
 
+#define CREAT_TBL(db, name, tbl)					\
+    sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS" x20 #name "(" tbl ");" ,NULL, NULL, NULL) 
+
+#endif
+
+/* -------------------------------------SCHEMA---------------------------------------------------------------- */
 
 #define USR_TABLE					\
     TCV (uid,  INTEGER, PK)				\
@@ -475,25 +487,9 @@ sqlite3 *db;
     
 #define BOAT_TABLE				\
     TCV(year,INTEGER)				\
-    TCVL(length, INTEGER, NN UQ)
+    TCVL(length, INTEGER, NN)
 
-
-
-#define CREAT_TBL(name, tbl) "CREATE TABLE IF NOT EXISTS" x20 #name "(" tbl ");"
-
-CREAT_TBL(players,USR_TABLE)
-
-/* zz */
-/* (unixepoch()) INT */
-/* CURRENT_TIMESTAMP is text */
-
-/* sqlite3_column_int(stmt, 0);
-sqlite3_column_text(stmt, 1);
-sqlite3_column_int64(stmt, 2); */
-
-/* ============================================================================================== */
-
-
+/* -------------------------------------INITIALIZATION-------------------------------------------------------   */
 void init_db() {
     int rc = sqlite3_open("mb_data.db",&db);
     SQLITE_SET_PRAGMA(journal_mode, SQLITE_JOURNAL_MODE);
@@ -502,28 +498,37 @@ void init_db() {
 }
 
 void create_tables() {
-    
+    CREAT_TBL(db, players,USR_TABLE);
+    CREAT_TBL(db, boats, BOAT_TABLE);
 }
 
-//#define MB_CREATE_TABLE(name, ...) "CREATE TABLE IF NOT EXISTS" #name "(" ");"
+void populate_tables(){}	/* for testing */
 
-// name, dataype, constraints
+/* ---------------------------------CLEAN UP NAME SPACE------------------------------------------------------------ */
 
-/*
+#undef DEV_MODE
+#undef x20
+#undef COMMA
 
-uid, int, primary key auto incrment
-first_name, text, NOT NULL UNIQUE
-last_name, text, NOT NULL
-phone ,INTEGER
-FOREIGN KEY (uid) REFERENCES users(uid)
-DEFAULT(unixepoch())
+/* column constraints */
+#undef PK
+#undef NN
+#undef UQ
+#undef DF
 
-*/
+/* Table column definitions */
+#undef TCV
+#undef TCVL
+#undef	TBC_FK
+#undef	TBCL_FK
+#undef CREAT_TBL
+
+/* ================================== END DB ============================================================ */
 
 int main(void) {
 
     init_db();
-    
+    create_tables();
 
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
