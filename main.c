@@ -4,6 +4,7 @@
 #include <string.h>
 #include "mac_types.h"
 #include "mongoose.h"
+#include "sqlite3.h"
 #include "cJSON.h"
 #include "uthash.h"
 
@@ -432,7 +433,6 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     
 int main(void) {
     struct mg_mgr mgr;
-    printf("hello");
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
 

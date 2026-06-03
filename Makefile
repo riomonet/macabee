@@ -18,6 +18,8 @@ sqlite3.o: sqlite3.c
 main.o: main.c
 	gcc -c main.c
 
+clean:
+	rm *.o a.out
 
 
 
