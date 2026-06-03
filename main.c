@@ -460,31 +460,18 @@ sqlite3 *db;
 /* Table column definitions */
 #define TCV(name, type, ...)      #name x20 #type  __VA_ARGS__ COMMA
 #define TCVL(name, type, ...)     #name x20 #type  __VA_ARGS__ 
-#define TBC(name, type)           #name x20 #type  COMMA
-#define TBC_PK(name, type)        #name x20 #type  PK COMMA
-#define	TBC_NN(name, type)	  #name x20 #type  NN COMMA
-#define	TBC_NNU(name, type)	  #name x20 #type  NN UQ COMMA
-#define	TBC_NND(name, type, dval) #name x20 #type  NN DF  #dval COMMA
-#define	TBC_D(name, type, dval)   #name x20 #type  DF #dval COMMA
 #define	TBC_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")" COMMA
-
-#define TBCL(name, type)           #name x20 #type
-#define TBCL_PK(name, type)        #name x20 #type x20 PK
-#define	TBCL_NN(name, type)	  #name x20 #type x20 NN 
-#define	TBCL_NNU(name, type)	  #name x20 #type x20 NN x20 UQ
-#define	TBCL_NND(name, type, dval) #name x20 #type x20 NN x20 DF x20 #dval
-#define	TBCL_D(name, type, dval)   #name x20 #type x20 DF x20 #dval
 #define	TBCL_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")"
 
 
 
 
-#define USR_TABLE				\
-    TBC_PK(uid, INTEGER) 			\
-    TBC_NN(fname,TEXT) 				\
-    TBC_NND(log, TEXT, CURRENT_TIMESTAMP)	\
-    TBC_NND(log,INT,(unixepoch()))		\
-    TBCL_NN(lname,TEXT)				\
+#define USR_TABLE					\
+    TCV (uid,  INTEGER, PK)				\
+    TCV (fname,TEXT,    NN)				\
+    TCV (log,  TEXT,    NN DF(CURRENT_TIMESTAMP))	\
+    TCV (other,INTEGER, DF((unixepoch())))		\
+    TCVL(lname,TEXT,    NN)				\
     
 #define BOAT_TABLE				\
     TCV(year,INTEGER)				\
