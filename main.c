@@ -205,7 +205,6 @@ struct screen screens[] = {
 
 /* ---------------------------- World state management ------------------------------------ */
 
-
 struct player {
     struct mg_connection *c;
     UT_hash_handle hh;
@@ -256,13 +255,13 @@ void mb_send (struct player *player, struct screen *scr) {
 }
 
 void init_authenticated_player(struct player *player, u16 uid, char *username) {
+    player->scrid = SCR_MAIN;
     player->auth.logintim = time(NULL);
     //    player->auth.permissions = get_permissions(uid);
     player->auth.uid = uid;
     strcpy(player->auth.uname, username);
     player->auth.attempts = 0;
     player->auth.locked_until = 0;
-    player->scrid = SCR_MAIN;
 }
 
 
@@ -296,6 +295,7 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 
 /* Returns 0 on failure and 1 on success */
 int verify_login_credentials(char *user, char *pw) {
+    /* database: permissions etc... in mem? */
     if ((strcmp(user, "Marvin") == 0) &&
         (strcmp(pw  , "Buncher") == 0)) {
             return 99;
@@ -432,6 +432,7 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     
 int main(void) {
     struct mg_mgr mgr;
+    printf("hello");
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
 
