@@ -1,0 +1,19 @@
+* open a db file
+sqlite3 file
+* set the mode for printing
+.mode table (sets to table mode)
+.mode column (sets to column mode)
+.mode markdown (sets to markdown mode)
+* examine schema
+.schema --indent TBL           #TBL is the name of the table --indent is pretty print
+* list tables
+.table
+* list indexes
+.indexes
+* profile queries
+.eqp on   #explains the query
+.timer on #wall clock time for query
+.stats on #memeory usage and other stats
+* import csv files
+.import file [table]
+.set CHAR  #char sets your seperator

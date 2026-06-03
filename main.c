@@ -45,6 +45,9 @@
     X(id, txt, len, flg, col)
 
 #define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
+#define STR2(X) #X
+#define STR(X) STR2(X)
+
 
 #define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos)   \
     {       .op_A = (opA),                                  \
@@ -264,7 +267,7 @@ void init_authenticated_player(struct player *player, u16 uid, char *username) {
     player->auth.attempts = 0;
     player->auth.locked_until = 0;
 }
-
+     
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
 void render_login_warning(struct player *player) {
@@ -430,8 +433,111 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         }
     }
 }
+
+/* ===============================DATABASE====================================================== */
+/* create table */
+/* insert into table */
+
+#define SQLITE_JOURNAL_MODE wal
+#define SQLITE_SYNC normal
+#define SQLITE_FOREIGN_KEYS on
+#define SQLITE_SET_PRAGMA(mode,val) sqlite3_exec(db,"PRAGMA " #mode "=" STR(val), NULL, NULL, NULL)
+
+
+sqlite3 *db;
+/* zz */
+
+
+#define x20 " "
+#define COMMA ","
+
+/* column constraints */
+#define PK x20 "PRIMARY KEY"
+#define NN x20 "NOT NULL"
+#define UQ x20 "UNIQUE"
+#define DF(dval) x20 "DEFAULT" x20 #dval
+
+/* Table column definitions */
+#define TCV(name, type, ...)      #name x20 #type  __VA_ARGS__ COMMA
+#define TCVL(name, type, ...)     #name x20 #type  __VA_ARGS__ 
+#define TBC(name, type)           #name x20 #type  COMMA
+#define TBC_PK(name, type)        #name x20 #type  PK COMMA
+#define	TBC_NN(name, type)	  #name x20 #type  NN COMMA
+#define	TBC_NNU(name, type)	  #name x20 #type  NN UQ COMMA
+#define	TBC_NND(name, type, dval) #name x20 #type  NN DF  #dval COMMA
+#define	TBC_D(name, type, dval)   #name x20 #type  DF #dval COMMA
+#define	TBC_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")" COMMA
+
+#define TBCL(name, type)           #name x20 #type
+#define TBCL_PK(name, type)        #name x20 #type x20 PK
+#define	TBCL_NN(name, type)	  #name x20 #type x20 NN 
+#define	TBCL_NNU(name, type)	  #name x20 #type x20 NN x20 UQ
+#define	TBCL_NND(name, type, dval) #name x20 #type x20 NN x20 DF x20 #dval
+#define	TBCL_D(name, type, dval)   #name x20 #type x20 DF x20 #dval
+#define	TBCL_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")"
+
+
+
+
+#define USR_TABLE				\
+    TBC_PK(uid, INTEGER) 			\
+    TBC_NN(fname,TEXT) 				\
+    TBC_NND(log, TEXT, CURRENT_TIMESTAMP)	\
+    TBC_NND(log,INT,(unixepoch()))		\
+    TBCL_NN(lname,TEXT)				\
     
+#define BOAT_TABLE				\
+    TCV(year,INTEGER)				\
+    TCVL(length, INTEGER, NN UQ)
+
+
+
+#define CREAT_TBL(name, tbl) "CREATE TABLE IF NOT EXISTS" x20 #name "(" tbl ");"
+
+CREAT_TBL(players,USR_TABLE)
+
+/* zz */
+/* (unixepoch()) INT */
+/* CURRENT_TIMESTAMP is text */
+
+/* sqlite3_column_int(stmt, 0);
+sqlite3_column_text(stmt, 1);
+sqlite3_column_int64(stmt, 2); */
+
+/* ============================================================================================== */
+
+
+void init_db() {
+    int rc = sqlite3_open("mb_data.db",&db);
+    SQLITE_SET_PRAGMA(journal_mode, SQLITE_JOURNAL_MODE);
+    SQLITE_SET_PRAGMA(synchronous, SQLITE_SYNC);
+    SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
+}
+
+void create_tables() {
+    
+}
+
+//#define MB_CREATE_TABLE(name, ...) "CREATE TABLE IF NOT EXISTS" #name "(" ");"
+
+// name, dataype, constraints
+
+/*
+
+uid, int, primary key auto incrment
+first_name, text, NOT NULL UNIQUE
+last_name, text, NOT NULL
+phone ,INTEGER
+FOREIGN KEY (uid) REFERENCES users(uid)
+DEFAULT(unixepoch())
+
+*/
+
 int main(void) {
+
+    init_db();
+    
+
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
@@ -440,6 +546,7 @@ int main(void) {
 	mg_mgr_poll(&mgr,1000);
      }
     return 0;
+    sqlite3_close(db);
 }
 
 
@@ -515,3 +622,14 @@ update screen
 /* #undef X */
 
 /* Account locked. Try again in 3 seconds. */
+
+/* sqlite common settings
+   ---------------------
+   PRAGMA journal_mode;
+   PRAGMA synchronous;
+   PRAGMA foreign_keys;
+   PRAGMA cache_size;
+   PRAGMA page_size;
+   PRAGMA temp_store;
+   PRAGMA mmap_size;
+*/
