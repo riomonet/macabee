@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <sodium.h>
 #include "mac_types.h"
 #include "mongoose.h"
 #include "sqlite3.h"
@@ -297,8 +298,33 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 
 /* ----------------------------- Business Rules ------------------------------------------------------------------- */
 
+char *mb_hash_password(char *pw) {
+
+    char hashed_password[crypto_pwhash_STRBYTES]; 
+    if (crypto_pwhash_str (hashed_password,
+			   pw, strlen(pw),
+			   crypto_pwhash_OPSLIMIT_SENSITIVE,
+			   crypto_pwhash_MEMLIMIT_SENSITIVE) != 0) {
+	perror("FAILED TO HASH PASSWORD");
+	exit(1); //TODO: How should I handle this case???
+    }
+
+    return hashed_password;
+}
+
+
 /* Returns 0 on failure and 1 on success */
 int verify_login_credentials(char *user, char *pw) {
+
+    /* verify user exists */
+    /* verify password */
+    
+    if (crypto_pwhash_str_verify
+	(hashed_password, PASSWORD, strlen(PASSWORD)) != 0) {
+	/* wrong password */
+    }
+
+    
     /* database: permissions etc... in mem? */
     if ((strcmp(user, "Marvin") == 0) &&
         (strcmp(pw  , "Buncher") == 0)) {
@@ -308,6 +334,7 @@ int verify_login_credentials(char *user, char *pw) {
 }
 
 int get_permissions(u16 uid) {
+    (void) uid;
     return 1;
 }
 
@@ -373,7 +400,8 @@ void extract_login_creds(char *uname, char *pw, u8 *reqbuf) {
     
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
-    
+
+    (void) reqbuflen;
     struct player *player = NULL;
     HASH_FIND_PTR(players,&c, player);
 
@@ -436,7 +464,6 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 
 /* ===============================DATABASE====================================================== */
 
-
 /* ---------------- SQL DSL FOR INITIALIZING DB and CREATING TABLES --------------------------- */
 
 #define DEV_MODE 1
@@ -479,11 +506,11 @@ sqlite3 *db;
 /* -------------------------------------SCHEMA---------------------------------------------------------------- */
 
 #define USR_TABLE					\
-    TCV (uid,  INTEGER, PK)				\
-    TCV (fname,TEXT,    NN)				\
-    TCV (log,  TEXT,    NN DF(CURRENT_TIMESTAMP))	\
-    TCV (other,INTEGER, DF((unixepoch())))		\
-    TCVL(lname,TEXT,    NN)				\
+    TCV (id,  INTEGER, PK)				\
+    TCV (email, TEXT, NN UQ)				\
+    TCVL(passwd, TEXT, NN UQ)
+
+    /* NOTE:(ari) Add phone as text in e.164 format  */
     
 #define BOAT_TABLE				\
     TCV(year,INTEGER)				\
@@ -492,14 +519,14 @@ sqlite3 *db;
 /* -------------------------------------INITIALIZATION-------------------------------------------------------   */
 void init_db() {
     int rc = sqlite3_open("mb_data.db",&db);
+    (void) rc;
     SQLITE_SET_PRAGMA(journal_mode, SQLITE_JOURNAL_MODE);
     SQLITE_SET_PRAGMA(synchronous, SQLITE_SYNC);
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
 }
 
 void create_tables() {
-    CREAT_TBL(db, players,USR_TABLE);
-    CREAT_TBL(db, boats, BOAT_TABLE);
+    CREAT_TBL(db, players, USR_TABLE);
 }
 
 void populate_tables(){}	/* for testing */
@@ -519,17 +546,36 @@ void populate_tables(){}	/* for testing */
 /* Table column definitions */
 #undef TCV
 #undef TCVL
-#undef	TBC_FK
-#undef	TBCL_FK
+#undef TBC_FK
+#undef TBCL_FK
 #undef CREAT_TBL
 
 /* ================================== END DB ============================================================ */
 
-int main(void) {
+/* ================================== CRYPTO ============================================================ */
 
+
+
+
+
+
+
+
+
+
+/* ================================== END CRYPTO ============================================================ */ 
+
+#define PASSWORD "Correct Horse Battery Staple"
+#define KEY_LEN crypto_box_SEEDBYTES //32U
+
+int main(void) {
+    
     init_db();
     create_tables();
+    
 
+
+    
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
