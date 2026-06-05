@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sodium.h>
+
 #include "mac_types.h"
 #include "mongoose.h"
 #include "sqlite3.h"
@@ -62,15 +64,15 @@
 /* -------------------- LOGIN SCREEN --------------------- */
 
 /* col, row */
-#define LOGIN_SCREEN_FIELDS                                                     \
+#define LOGIN_SCREEN_FIELDS						\
     LABEL(LOGIN_L1           , 9,   8, 27,     "USER . . . . . . . . . . . ") \
         LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ") \
         INPUT(LOGIN_IUSER    , 38,  8, 24)                              \
         INPUT_F(LOGIN_IPW    , 38, 10, 24,PASSWORD)                     \
         LABEL_CF(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT,CYAN) \
         LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE) \
-        STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)                   \
-
+        STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)			\
+	
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum LOGIN_SCR_IDX {
     LOGIN_SCREEN_FIELDS
@@ -116,7 +118,7 @@ enum LOGIN_SCR_IDX {
     LABEL(MAIN_L14,6,28,9,"F6=Logout")                          \
     LABEL(MAIN_L15,19,28,9, "F7=Search")                        \
     LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")                 \
-    HL(MAIN_HL2,0,29,100)                                      \
+    HL(MAIN_HL2,0,29,100)					\
     HL(MAIN_HL3,7,24,90)                                     
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
@@ -297,34 +299,35 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 }
 
 /* ----------------------------- Business Rules ------------------------------------------------------------------- */
+struct pwd {
+    char hash[crypto_pwhash_STRBYTES];
+};
 
-char *mb_hash_password(char *pw) {
+struct pwd mb_hash_password(char *pw) {
+    struct pwd pwd;
 
-    char hashed_password[crypto_pwhash_STRBYTES]; 
-    if (crypto_pwhash_str (hashed_password,
+    if (crypto_pwhash_str (pwd.hash,
 			   pw, strlen(pw),
 			   crypto_pwhash_OPSLIMIT_SENSITIVE,
 			   crypto_pwhash_MEMLIMIT_SENSITIVE) != 0) {
 	perror("FAILED TO HASH PASSWORD");
 	exit(1); //TODO: How should I handle this case???
     }
-
-    return hashed_password;
+    return pwd;
 }
-
 
 /* Returns 0 on failure and 1 on success */
 int verify_login_credentials(char *user, char *pw) {
 
     /* verify user exists */
     /* verify password */
+    char *hashed_password = NULL; // retrieve form db
     
     if (crypto_pwhash_str_verify
-	(hashed_password, PASSWORD, strlen(PASSWORD)) != 0) {
+	(hashed_password, pw, strlen(pw)) != 0) {
 	/* wrong password */
     }
 
-    
     /* database: permissions etc... in mem? */
     if ((strcmp(user, "Marvin") == 0) &&
         (strcmp(pw  , "Buncher") == 0)) {
@@ -483,11 +486,6 @@ sqlite3 *db;
 #define UQ x20 "UNIQUE"
 #define DF(dval) x20 "DEFAULT" x20 #dval
 
-/* Table column definitions */
-#define TCV(name, type, ...)      #name x20 #type  __VA_ARGS__ COMMA
-#define TCVL(name, type, ...)     #name x20 #type  __VA_ARGS__ 
-#define	TBC_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")" COMMA
-#define	TBCL_FK(name, tbl, col)  "FOREIGN KEY(" #name ") REFERENCES" x20 #tbl"(" #col ")"
 
 #ifdef DEV_MODE
 #define CREAT_TBL(db, name, tbl)					\
@@ -503,20 +501,118 @@ sqlite3 *db;
 
 #endif
 
-/* -------------------------------------SCHEMA---------------------------------------------------------------- */
+/* ------------------------------------- SCHEMA -------------------------------------------------- */
 
-#define USR_TABLE					\
-    TCV (id,  INTEGER, PK)				\
-    TCV (email, TEXT, NN UQ)				\
-    TCVL(passwd, TEXT, NN UQ)
+struct db_table {
+    const char *name;
+    const char *schema;
+};
 
+typedef char username_t[32];
+typedef char email_t[128];
+
+/* COLUMN DEFINTIONS FOR ALL SCHEMA */
+#define USR_SCHEMA					\
+    TCV(USR_C,  rid,   u16, INTEGER, PK)		\
+    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
+    TCVL(USR_C, uid,   u16, INTEGER, NN UQ)	
     /* NOTE:(ari) Add phone as text in e.164 format  */
-    
-#define BOAT_TABLE				\
-    TCV(year,INTEGER)				\
-    TCVL(length, INTEGER, NN)
 
-/* -------------------------------------INITIALIZATION-------------------------------------------------------   */
+
+/* Schema derived db tables. */
+#define TCV(tbl,  name, ctype, type, ...) #name x20 #type  __VA_ARGS__ COMMA
+#define TCVL(tbl, name, ctype, type, ...) #name x20 #type  __VA_ARGS__ 
+
+struct db_table db_schema[32] = {
+    { "players", USR_SCHEMA },
+};
+
+#undef TCV
+#undef TCVL
+
+/* Schema derived enums. */
+#define TCV(tbl, name, ctype, type, ...)  tbl##_##name,
+#define TCVL(tbl, name, ctype,type,  ...) tbl##_##name,
+#define TCOLS(name, tbl) enum name { tbl name##_CNT };
+
+TCOLS(USR_COL, USR_SCHEMA)
+
+#undef TCV
+#undef TCVL
+
+/* Schema derived structs. */
+#define TCV(tbl, name, ctype, type, ...) ctype name;
+#define TCVL(tbl, name, ctype,type,  ...) ctype name;
+#define TX_REC(name, tbl) struct name {tbl};
+
+TX_REC(usr_tbl, USR_SCHEMA)
+
+#undef TCV
+#undef TCVL
+
+/* Schema derived strings. */
+#define TCV(tbl, name, ctype, type, ...) #name,
+#define TCVL(tbl, name, ctype,type,  ...) #name,
+
+const char *usr_table_strings[] = {USR_SCHEMA};
+
+#undef TCV
+#undef TCVL
+#undef DEV_MODE
+#undef x20
+#undef COMMA
+#undef PK
+#undef NN
+#undef UQ
+#undef DF
+#undef TBC_FK
+#undef TBCL_FK
+#undef CREAT_TBL
+
+
+
+
+
+
+/* ---------------------------------QUERIES------------------------------------------------------------ */
+#define SQLITE_READ_TO_NUL -1
+
+sqlite3_stmt *create_statement(sqlite3 *db, char *q) { 
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db, q, SQLITE_READ_TO_NUL, &stmt,NULL);
+    return stmt;
+}
+
+struct mb_query {
+    sqlite3_stmt *get_user_by_uid;
+};
+
+struct mb_query query;
+
+void init_queries (sqlite3 *db) {
+    query.get_user_by_uid = create_statement(db, "select * from users where uid = ?");
+}
+
+struct user {
+    int uid;
+};
+
+/* returns a single user */
+struct user get_user_by_id(sqlite3_stmt *stmt, int uid) {
+    struct user user;
+    int cnt = 0;
+    (void) cnt;
+    sqlite3_bind_int(stmt, 1, uid);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+	user.uid = sqlite3_column_int(stmt, 0);
+    }
+    return user;
+}
+
+/* -------------------------------------INITIALIZATION----------------------------------------------------------   */
+void create_tables() {
+}
+
 void init_db() {
     int rc = sqlite3_open("mb_data.db",&db);
     (void) rc;
@@ -525,57 +621,18 @@ void init_db() {
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
 }
 
-void create_tables() {
-    CREAT_TBL(db, players, USR_TABLE);
-}
+//sqlite3_bind_int(stmt, 1, uid);
+//sqlite3_bind_text(stmt, 2, fname, -1, SQLITE_STATIC); 
 
-void populate_tables(){}	/* for testing */
-
-/* ---------------------------------CLEAN UP NAME SPACE------------------------------------------------------------ */
-
-#undef DEV_MODE
-#undef x20
-#undef COMMA
-
-/* column constraints */
-#undef PK
-#undef NN
-#undef UQ
-#undef DF
-
-/* Table column definitions */
-#undef TCV
-#undef TCVL
-#undef TBC_FK
-#undef TBCL_FK
-#undef CREAT_TBL
 
 /* ================================== END DB ============================================================ */
-
-/* ================================== CRYPTO ============================================================ */
-
-
-
-
-
-
-
-
-
-
-/* ================================== END CRYPTO ============================================================ */ 
-
-#define PASSWORD "Correct Horse Battery Staple"
-#define KEY_LEN crypto_box_SEEDBYTES //32U
 
 int main(void) {
     
     init_db();
     create_tables();
-    
+    init_queries(db);
 
-
-    
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
