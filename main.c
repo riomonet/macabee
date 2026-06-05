@@ -514,7 +514,7 @@ typedef char email_t[128];
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 #define USR_SCHEMA					\
     TCV(USR_C,  rid,   u16, INTEGER, PK)		\
-    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
+    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\ 
     TCVL(USR_C, uid,   u16, INTEGER, NN UQ)	
     /* NOTE:(ari) Add phone as text in e.164 format  */
 
