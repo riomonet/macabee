@@ -469,13 +469,16 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 
 /* ---------------- SQL DSL FOR INITIALIZING DB and CREATING TABLES --------------------------- */
 
-#define DEV_MODE 1
+
 sqlite3 *db;
 
 #define SQLITE_JOURNAL_MODE wal
 #define SQLITE_SYNC normal
 #define SQLITE_FOREIGN_KEYS on
 #define SQLITE_SET_PRAGMA(mode,val) sqlite3_exec(db,"PRAGMA " #mode "=" STR(val), NULL, NULL, NULL)
+
+
+/* ------------------------------------- SCHEMA -------------------------------------------------- */
 
 #define x20 " "
 #define COMMA ","
@@ -487,26 +490,6 @@ sqlite3 *db;
 #define DF(dval) x20 "DEFAULT" x20 #dval
 
 
-#ifdef DEV_MODE
-#define CREAT_TBL(db, name, tbl)					\
-    do {								\
-	sqlite3_exec(db, "DROP TABLE IF EXISTS"        x20 #name ";"          ,NULL, NULL, NULL); \
-	sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS"  x20 #name "(" tbl ");" ,NULL, NULL, NULL); \
-    } while(0)							       
-
-#else
-
-#define CREAT_TBL(db, name, tbl)					\
-    sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS" x20 #name "(" tbl ");" ,NULL, NULL, NULL) 
-
-#endif
-
-/* ------------------------------------- SCHEMA -------------------------------------------------- */
-
-struct db_table {
-    const char *name;
-    const char *schema;
-};
 
 typedef char username_t[32];
 typedef char email_t[128];
@@ -514,7 +497,7 @@ typedef char email_t[128];
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 #define USR_SCHEMA					\
     TCV(USR_C,  rid,   u16, INTEGER, PK)		\
-    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\ 
+    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
     TCVL(USR_C, uid,   u16, INTEGER, NN UQ)	
     /* NOTE:(ari) Add phone as text in e.164 format  */
 
@@ -522,9 +505,16 @@ typedef char email_t[128];
 /* Schema derived db tables. */
 #define TCV(tbl,  name, ctype, type, ...) #name x20 #type  __VA_ARGS__ COMMA
 #define TCVL(tbl, name, ctype, type, ...) #name x20 #type  __VA_ARGS__ 
+#define SQL_CREAT(name, tbl) "CREATE TABLE IF NOT EXISTS"  x20 #name "(" tbl ");"
+#define SQL_DROP(name) "DROP TABLE IF EXISTS" x20 #name ";"
+
+struct db_table {
+    const char *creat;
+    const char *drop;
+};
 
 struct db_table db_schema[32] = {
-    { "players", USR_SCHEMA },
+	{SQL_CREAT(players,USR_SCHEMA),SQL_DROP(players)},
 };
 
 #undef TCV
@@ -543,9 +533,9 @@ TCOLS(USR_COL, USR_SCHEMA)
 /* Schema derived structs. */
 #define TCV(tbl, name, ctype, type, ...) ctype name;
 #define TCVL(tbl, name, ctype,type,  ...) ctype name;
-#define TX_REC(name, tbl) struct name {tbl};
+#define STRUCT_REC(name, tbl) struct name {tbl};
 
-TX_REC(usr_tbl, USR_SCHEMA)
+STRUCT_REC(usr_rec, USR_SCHEMA)
 
 #undef TCV
 #undef TCVL
@@ -558,7 +548,6 @@ const char *usr_table_strings[] = {USR_SCHEMA};
 
 #undef TCV
 #undef TCVL
-#undef DEV_MODE
 #undef x20
 #undef COMMA
 #undef PK
@@ -567,11 +556,6 @@ const char *usr_table_strings[] = {USR_SCHEMA};
 #undef DF
 #undef TBC_FK
 #undef TBCL_FK
-#undef CREAT_TBL
-
-
-
-
 
 
 /* ---------------------------------QUERIES------------------------------------------------------------ */
@@ -589,28 +573,31 @@ struct mb_query {
 
 struct mb_query query;
 
-void init_queries (sqlite3 *db) {
-    query.get_user_by_uid = create_statement(db, "select * from users where uid = ?");
-}
 
-struct user {
-    int uid;
-};
-
-/* returns a single user */
-struct user get_user_by_id(sqlite3_stmt *stmt, int uid) {
-    struct user user;
+//returns a single user
+struct usr_rec get_user_by_id(sqlite3_stmt *stmt, int uid) {
+    struct usr_rec usr;
     int cnt = 0;
     (void) cnt;
     sqlite3_bind_int(stmt, 1, uid);
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-	user.uid = sqlite3_column_int(stmt, 0);
+	usr.rid = sqlite3_column_int(stmt, 0);
     }
-    return user;
+    return usr;
 }
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
+#define DEV_MODE 1
+
 void create_tables() {
+    for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
+	if(DEV_MODE) {
+	    sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL); 
+	    sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+	} else {
+	    sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+	}
+    }
 }
 
 void init_db() {
@@ -620,6 +607,11 @@ void init_db() {
     SQLITE_SET_PRAGMA(synchronous, SQLITE_SYNC);
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
 }
+
+void init_queries (sqlite3 *db) {
+    query.get_user_by_uid = create_statement(db, "select * from users where uid = ?");
+}
+
 
 //sqlite3_bind_int(stmt, 1, uid);
 //sqlite3_bind_text(stmt, 2, fname, -1, SQLITE_STATIC); 
