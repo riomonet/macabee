@@ -11,6 +11,8 @@
 #include "cJSON.h"
 #include "uthash.h"
 
+
+#define UID_NF UINT16_MAX
 /*============================================================================
        BIG FUCKING BUSINESS HERE
 ===============================================================================*/
@@ -192,6 +194,7 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
     return netscr;
 }
 
+/* def_screen */
 struct screen {
     u8 op_A;
     u8 op_B;
@@ -212,6 +215,8 @@ struct screen screens[] = {
 
 /* ---------------------------- World state management ------------------------------------ */
 
+
+/* def_player */
 struct player {
     struct mg_connection *c;
     UT_hash_handle hh;
@@ -238,9 +243,11 @@ struct player *onboard_new_player(struct mg_connection *c) {
     struct player *player = (struct player*) malloc(sizeof(*player));
     player->c = c;
     player->scrid = SCR_LOGIN;
-    player->auth.uname[0] = '\0';
-    player->auth.uid = 0;            /* Unitialized */
+    player->auth.logintim = 0;
     player->auth.attempts = 0;
+    player->auth.permissions = 0;
+    memset(player->auth.uname, 0, sizeof(player->auth.uname)); 
+    player->auth.uid = UID_NF;           
     player->auth.locked_until = 0;
     HASH_ADD_PTR(players, c, player);
     return player;
@@ -261,19 +268,17 @@ void mb_send (struct player *player, struct screen *scr) {
     mg_ws_send(player->c, payload.buf, payload.len, WEBSOCKET_OP_BINARY);
 }
 
-void init_authenticated_player(struct player *player, u16 uid, char *username) {
+void init_authenticated_player(struct player *player) {
     player->scrid = SCR_MAIN;
     player->auth.logintim = time(NULL);
     //    player->auth.permissions = get_permissions(uid);
-    player->auth.uid = uid;
-    strcpy(player->auth.uname, username);
     player->auth.attempts = 0;
     player->auth.locked_until = 0;
 }
      
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
-void render_login_warning(struct player *player) {
+void render_login_warning(struct player *player, char *txt) {
     struct screen scr;
     struct field_state buf[1];
     
@@ -283,10 +288,10 @@ void render_login_warning(struct player *player) {
     scr.nFields = MAX_SLOTS(buf);
         
     struct field_state f = login_screen_state[LOGIN_WARNING];
-    f.fg_color = RED;
-    f.bg_color = GREEN;
+    f.fg_color = BROWN;
+    //f.bg_color = GREEN;
     f.flags &= ~HIDDEN;
-    strcpy(f.text,"Sorry, try again." );
+    strcpy(f.text, txt);
     f.text_len = strlen(f.text);
     
     buf[0] = f;
@@ -294,180 +299,14 @@ void render_login_warning(struct player *player) {
     mb_send(player,&scr);
 }
 
+
 void render_screen_template(struct player *player, u8 SCREEN) {
     mb_send(player, &screens[SCREEN]);    
 }
 
-/* ----------------------------- Business Rules ------------------------------------------------------------------- */
-struct pwd {
-    char hash[crypto_pwhash_STRBYTES];
-};
+/* ===============================DATABASE   ====================================== */
 
-struct pwd mb_hash_password(char *pw) {
-    struct pwd pwd;
-
-    if (crypto_pwhash_str (pwd.hash,
-			   pw, strlen(pw),
-			   crypto_pwhash_OPSLIMIT_SENSITIVE,
-			   crypto_pwhash_MEMLIMIT_SENSITIVE) != 0) {
-	perror("FAILED TO HASH PASSWORD");
-	exit(1); //TODO: How should I handle this case???
-    }
-    return pwd;
-}
-
-/* Returns 0 on failure and 1 on success */
-int verify_login_credentials(char *user, char *pw) {
-
-    /* verify user exists */
-    /* verify password */
-    char *hashed_password = NULL; // retrieve form db
-    
-    if (crypto_pwhash_str_verify
-	(hashed_password, pw, strlen(pw)) != 0) {
-	/* wrong password */
-    }
-
-    /* database: permissions etc... in mem? */
-    if ((strcmp(user, "Marvin") == 0) &&
-        (strcmp(pw  , "Buncher") == 0)) {
-            return 99;
-        }
-    return 0;
-}
-
-int get_permissions(u16 uid) {
-    (void) uid;
-    return 1;
-}
-
-int try_login(struct player *player, char *user, char *pw) {
-
-            if (time(NULL) < player->auth.locked_until) {
-                render_login_warning(player);
-                return 0;
-            }
-            u16 uid;
-            if ((uid = verify_login_credentials(user,pw)) > 0) {
-                return uid;
-            } else {
-                player->auth.attempts++;
-                if (player->auth.attempts >= 40) {
-                    player->auth.locked_until = time(NULL) + 3; /* 3 second timeout */
-                } 
-                render_login_warning(player);
-                return 0;
-            }
-}
-
-
-/*  ======================================================================================
-  
-                            CLIENT MESSAGE PROCESSING DEPT
-                            
-    ===================================================================================== */
-
-/* ------------------ CLIENT to SERVER MESSAGE FORMAT   ---------------------------
-                           | -------- | -------- | --------
-         Header:           | opcode   |  aidkey  | nFields  |
-
-                            | -------- | -------- | ------------------------|
-         Field blocks:     | field_id  |  fldlen  |      field_val 24       |
-         
----------------------------------------------------------------------------------------*/
-/* client req header item */
-struct __attribute__((packed)) cfh {
-    u8 opcode;
-    u8 AID;
-    u8 nFields;
-};
-
-/* client req field block field item */
-struct __attribute__((packed)) cfb {
-    u8 id;
-    u8 len;
-    char val[24];
-};
-
-void extract_login_creds(char *uname, char *pw, u8 *reqbuf) {
-    u8 *p = reqbuf;
-    if (p[2] < 2) return;
-    p += sizeof(struct cfh);
-    
-    struct cfb *user = (struct cfb*) p;
-    struct cfb *pass = (struct cfb*) (p + sizeof(*user));
-    
-    memcpy(uname, user->val,user->len);
-    memcpy(pw, pass->val, pass->len);
-}
-    
-/* Dispatch Business Logic */
-void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
-
-    (void) reqbuflen;
-    struct player *player = NULL;
-    HASH_FIND_PTR(players,&c, player);
-
-    if (!player) {              
-        /* Player is not yet added to the world. 
-         * add player to the world and send initial screen. */
-        player = onboard_new_player(c);
-        render_screen_template(player, SCR_LOGIN);
-        
-    } else {
-        
-        switch(player->scrid) {        /* Player is in the world. dispatch based on screen state.*/
-        case SCR_LOGIN:         
-            {
-                char uname[25] = {0}, pw[25] = {0};
-                extract_login_creds(uname, pw, reqbuf);
-                int uid = try_login(player, uname, pw);
-                if (uid) {
-                    printf("uid Success: %d",uid);
-                    init_authenticated_player(player, uid, uname);
-                    render_screen_template(player, SCR_MAIN);
-                }
-            } break;
-            
-        case SCR_MAIN:
-            {
-                /* Get aid key and deploy screen */
-                printf("IN SCRMAIN\n");
-                render_screen_template(player, SCR_MAIN);
-            } break;
-        }
-    }
-}
-
-/* ===========================================================================
-       The MONGOOSE HERE
-   =========================================================================== */
-
-void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
-    switch (ev) {
-    case MG_EV_HTTP_MSG:
-        {  
-            struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-            if ( mg_match (hm->uri, mg_str("/"), NULL)) {
-                struct mg_http_serve_opts opts = {.root_dir = ".", .fs = &mg_fs_posix};
-                mg_http_serve_dir(c, hm, &opts);
-            } else {
-                mg_ws_upgrade(c, hm, NULL);
-            }
-        } break;
-    case MG_EV_WS_MSG:
-        {
-            struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-            if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
-                dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); 
-            }
-        }
-    }
-}
-
-/* ===============================DATABASE====================================================== */
-
-/* ---------------- SQL DSL FOR INITIALIZING DB and CREATING TABLES --------------------------- */
+/* ---------------- SQL DSL FOR INITIALIZING DB and CREATING TABLES --------------- */
 
 
 sqlite3 *db;
@@ -477,8 +316,8 @@ sqlite3 *db;
 #define SQLITE_FOREIGN_KEYS on
 #define SQLITE_SET_PRAGMA(mode,val) sqlite3_exec(db,"PRAGMA " #mode "=" STR(val), NULL, NULL, NULL)
 
+/* --------------------------------- SCHEMA --------------------------------------- */
 
-/* ------------------------------------- SCHEMA -------------------------------------------------- */
 
 #define x20 " "
 #define COMMA ","
@@ -489,16 +328,23 @@ sqlite3 *db;
 #define UQ x20 "UNIQUE"
 #define DF(dval) x20 "DEFAULT" x20 #dval
 
+typedef char name_t[25]; 
+typedef char email_t[25];
+typedef char e164_t[17];
+typedef char pass_t[crypto_pwhash_STRBYTES];
 
-
-typedef char username_t[32];
-typedef char email_t[128];
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 #define USR_SCHEMA					\
     TCV(USR_C,  rid,   u16, INTEGER, PK)		\
+    TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
+    TCV(USR_C,  rmid,  u16, INTEGER, NN UQ)		\
     TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
-    TCVL(USR_C, uid,   u16, INTEGER, NN UQ)	
+    TCV(USR_C,  phone, e164_t, TEXT, NN UQ)		\
+    TCV(USR_C,  pw_hash, pass_t, TEXT, NN UQ  )		\
+    TCV(USR_C, first, name_t, TEXT)			\
+    TCVL(USR_C, last, name_t, TEXT)			
+
     /* NOTE:(ari) Add phone as text in e.164 format  */
 
 
@@ -546,6 +392,7 @@ STRUCT_REC(usr_rec, USR_SCHEMA)
 
 const char *usr_table_strings[] = {USR_SCHEMA};
 
+
 #undef TCV
 #undef TCVL
 #undef x20
@@ -567,35 +414,106 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
     return stmt;
 }
 
-struct mb_query {
-    sqlite3_stmt *get_user_by_uid;
+struct usr_query {
+    sqlite3_stmt *gusr[USR_COL_CNT];
+    sqlite3_stmt *ausr;
 };
 
-struct mb_query query;
+struct usr_query usr_queries;
 
-
-//returns a single user
-struct usr_rec get_user_by_id(sqlite3_stmt *stmt, int uid) {
-    struct usr_rec usr;
-    int cnt = 0;
-    (void) cnt;
-    sqlite3_bind_int(stmt, 1, uid);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-	usr.rid = sqlite3_column_int(stmt, 0);
+struct usr_query init_queries(sqlite3 *db) {
+    struct usr_query uq;
+    
+    for (int i = 0; i < USR_COL_CNT; i++) {
+	char sql_txt[128];
+	snprintf(sql_txt, 128,"select * from users where %s = ?", usr_table_strings[i]);
+	uq.gusr[i] = create_statement(db, sql_txt);
     }
-    return usr;
+    
+    char *insert  = "INSERT INTO users "
+	"(uid, rmid, email, phone, first, last, pw_hash)"
+	"VALUES (?, ?, ?, ?, ?, ?, ?)";
+    
+    uq.ausr = create_statement(db,insert);
+
+    return uq;
+}
+
+int ausr(struct usr_rec *usr) {
+    sqlite3_stmt *stmt = usr_queries.ausr;
+
+    sqlite3_bind_int(stmt,  1, usr->uid);
+    sqlite3_bind_int(stmt,  2, usr->rmid);
+    sqlite3_bind_text(stmt, 3, usr->email, -1 , SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, usr->phone, -1 , SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 5, usr->first, -1 , SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 6, usr->last,  -1 , SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 6, usr->pw_hash,  -1 , SQLITE_STATIC);
+
+    int res = sqlite3_step(stmt);
+    (void)res;
+	
+    return 1;
+}
+
+
+/* fills in (array or single) 'usr_rec' for query typ */
+int gusr(u8 typ, void *val, struct usr_rec *usr) {
+    int success = 0;
+    sqlite3_stmt *stmt = usr_queries.gusr[typ];
+
+    /* Then just get pw_hash by USR_C_email */
+    if (typ == USR_C_pw_hash) {
+	sqlite3_bind_text(stmt, 1,(char *)val, -1 , SQLITE_STATIC);
+	if (sqlite3_step(stmt) == SQLITE_ROW) {
+	    strcpy(usr->pw_hash,  (const char*)sqlite3_column_text(stmt, USR_C_last));
+	    return 1;
+	} else {
+	    return 0;
+	}
+    }
+    
+    switch (typ) {
+    case USR_C_uid:
+    case USR_C_rmid:
+	sqlite3_bind_int(stmt, 1, *(int*)val);
+	break;
+
+    case USR_C_email:
+    case USR_C_phone:
+    case USR_C_first:
+    case USR_C_last:
+	 sqlite3_bind_text(stmt, 1,(char *)val, -1 , SQLITE_STATIC);
+	break;
+    }
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+	usr->uid = sqlite3_column_int(stmt,USR_C_uid);
+	usr->rmid = sqlite3_column_int(stmt,USR_C_rmid);
+	strcpy(usr->email, (const char*)sqlite3_column_text(stmt, USR_C_email));
+	strcpy(usr->phone, (const char*)sqlite3_column_text(stmt, USR_C_phone));
+	strcpy(usr->first, (const char*)sqlite3_column_text(stmt, USR_C_first));
+	strcpy(usr->last,  (const char*)sqlite3_column_text(stmt, USR_C_last));
+
+	success = 1;
+    }
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
+    return success;
 }
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
-#define DEV_MODE 1
 
+#define DEV_MODE 1
 void create_tables() {
     for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
-	if(DEV_MODE) {
-	    sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL); 
-	    sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
-	} else {
-	    sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+	if(db_schema[i].creat){
+	    if(DEV_MODE) {
+		sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL);
+		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+	    } else {
+		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+	    }
 	}
     }
 }
@@ -608,22 +526,157 @@ void init_db() {
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
 }
 
-void init_queries (sqlite3 *db) {
-    query.get_user_by_uid = create_statement(db, "select * from users where uid = ?");
+
+/* ============================     END DB          ============================================= */
+
+
+/* -----------------------------  Business Rules    --------------------------------------------- */
+
+struct pwd {
+    char hash[crypto_pwhash_STRBYTES];
+};
+
+struct pwd mb_hash_password(char *pw) {
+    struct pwd pwd;
+    if (crypto_pwhash_str (pwd.hash,
+			   pw, strlen(pw),
+			   crypto_pwhash_OPSLIMIT_SENSITIVE,
+			   crypto_pwhash_MEMLIMIT_SENSITIVE) != 0) {
+	perror("FAILED TO HASH PASSWORD");
+	exit(1); //TODO: How should I handle this case???
+    }
+    return pwd;
+}
+
+/* client req header item */
+struct __attribute__((packed)) cfh {
+    u8 opcode;
+    u8 AID;
+    u8 nFields;
+};
+
+/* client req field block field item */
+struct __attribute__((packed)) cfb {
+    u8 id; //field_id
+    u8 len;
+    char val[24];
+};
+
+void try_login(struct player *player, u8 *reqbuf) {
+
+    /* Prevent login for 3 seconds after 3 missed attempts */
+    
+    if (time(NULL) < player->auth.locked_until) {
+	render_login_warning(player, "Login lockout for 3 seconds.");
+	return;
+    }
+    /* Verify both input fields were submitted.. */
+    
+    struct cfh *header = (struct cfh*) reqbuf;
+    
+    if ( header->nFields < 2) {
+	player->auth.attempts++;
+	render_login_warning(player, "All fields required.");
+	return;
+    }
+
+    /* Copy 'user' and 'pass' from reqbuffer to player. */
+    u8 *input_fld = reqbuf += sizeof(header);
+	    
+    struct cfb *user = (struct cfb*) input_fld;  
+    struct cfb *pass = (struct cfb*) (input_fld + sizeof(*user));
+
+    /* Check the db for email_address is there.*/
+    struct usr_rec usr_rec;
+    int usr_found = gusr(USR_C_pw_hash, (void *)user->val, &usr_rec);
+
+    if(usr_found) {
+	int verified = crypto_pwhash_str_verify(usr_rec.pw_hash, pass->val, pass->len);
+	(void)verified;
+    }
+    else {
+	
+    }
 }
 
 
-//sqlite3_bind_int(stmt, 1, uid);
-//sqlite3_bind_text(stmt, 2, fname, -1, SQLITE_STATIC); 
 
+/* Dispatch Business Logic */
+void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
 
-/* ================================== END DB ============================================================ */
+    (void) reqbuflen;
+    struct player *player = NULL;
+    HASH_FIND_PTR(players,&c, player);
+
+    if (!player) {              
+        /* Player is not yet added to the world. 
+         * add player to the world and send initial screen. */
+        player = onboard_new_player(c);
+        render_screen_template(player, SCR_LOGIN);
+    } else {
+        switch(player->scrid) {        /* Player is in the world. dispatch based on screen state.*/
+        case SCR_LOGIN:         
+            {
+		try_login(player,reqbuf);
+		if (player->auth.uid != UID_NF) {
+		    render_screen_template(player, SCR_MAIN);
+		}
+		/* init_authenticated_player(player); */
+                /* if (extract_login_creds(player, reqbuf)) { */
+		/*     int uid = try_login(player,); */
+		/*     if (player->auth.uid != UID_NF) { */
+		/* 	printf("uid Success: %d",uid); */
+
+		/* 	render_screen_template(player, SCR_MAIN); */
+		/*     } */
+                /* } else { */
+		/*     render_login_warning(player, "Please enter user and pass"); */
+		    
+		/* }  */
+            } break;
+            
+        case SCR_MAIN:
+            {
+                /* Get aid key and deploy screen */
+                printf("IN SCRMAIN\n");
+                render_screen_template(player, SCR_MAIN);
+            } break;
+        }
+    }
+}
+
+/* ===========================================================================
+       The MONGOOSE HERE
+   =========================================================================== */
+
+void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
+    switch (ev) {
+    case MG_EV_HTTP_MSG:
+        {  
+            struct mg_http_message *hm = (struct mg_http_message *) ev_data;
+            if ( mg_match (hm->uri, mg_str("/"), NULL)) {
+                struct mg_http_serve_opts opts = {.root_dir = ".", .fs = &mg_fs_posix};
+                mg_http_serve_dir(c, hm, &opts);
+            } else {
+                mg_ws_upgrade(c, hm, NULL);
+            }
+        } break;
+    case MG_EV_WS_MSG:
+        {
+            struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
+            if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
+                dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); 
+            }
+        }
+    }
+}
+
 
 int main(void) {
     
     init_db();
     create_tables();
-    init_queries(db);
+    usr_queries = init_queries(db);
 
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
@@ -720,3 +773,10 @@ update screen
    PRAGMA temp_store;
    PRAGMA mmap_size;
 */
+
+/* MESSAGE FORMATS */
+
+/* ------------------ CLIENT to SERVER MESSAGE FORMAT   ---------------------------
+         Header:           | opcode u8  |  aidkey u8   | nFields u8    |
+         Field blocks:     | field_id  u8 |  fldlen u8 | field_val u24 |
+---------------------------------------------------------------------------------- */

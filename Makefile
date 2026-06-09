@@ -39,7 +39,7 @@ mongoose.o: mongoose.c
 sqlite3.o: sqlite3.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: main.c
+main.o: main.c 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 debug: macabee-debug

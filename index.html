@@ -267,9 +267,8 @@
          /* opcodeC |AID Key 1b| nFields | */
          /* Field blocks */
          /* |field_id 1b| field_len 1b| field_val | */
-          function send_changed_inputs_only(key) {
-
-              const field_len = 24;
+         function send_changed_inputs_only(key) {
+             const field_len = 24; //fixed width.
              const MDT = [];
              let bytes = 0;
              const encoder = new TextEncoder();
@@ -277,16 +276,19 @@
              bytes++; /* Opocde C */
              bytes++; /* AIDkey 1b*/
              bytes++; /* nFields 1b*/
+
              for (let i = 0; i < INPUTS.length; i++) {
+		 if (INPUTS[i].value.trim() === '') {
+		     INPUTS[i].isDirty = false;
+		 }
                  if (INPUTS[i].isDirty) {
                      MDT.push(INPUTS[i]);
                      bytes++; /* field_id 1b*/
                      bytes++; /* field_len 1b*/
                      bytes += field_len;
-//                     bytes += INPUTS[i].value.length;
                  }
              }
-              
+             
              const buffer = new ArrayBuffer(bytes);
              const copybook = new Uint8Array(buffer);
              let pos = 0;
@@ -314,7 +316,7 @@
          }
 
          function add_AID_keys() {
-	         add_key_event_listeners('Enter', 'keydown',send_changed_inputs_only);
+	         add_key_event_listeners('Enter', 'keydown', send_changed_inputs_only);
          }
 
          function set_dirty() {
@@ -383,10 +385,10 @@
              }
          }
 
-             function sys_render_terminal(view) {
+         function sys_render_terminal(view) {
 
-	         const decoder          = new TextDecoder('utf-8');
-             const headerSize       = 8;
+	     const decoder          = new TextDecoder('utf-8');
+	     const headerSize       = 8;
              const opcodeB          = view.getUint8(1);
              const fieldCount       = view.getUint8(2);
              const reserved         = view.getUint8(3);
