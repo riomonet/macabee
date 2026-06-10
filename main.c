@@ -330,22 +330,24 @@ typedef char e164_t[17];
 typedef char pass_t[crypto_pwhash_STRBYTES];
 
 
+/* TABLE INDEX */
 #define DB_TABLES				\
-    X(users,     USR_SCHEMA)			\
-    X(sys_state, SYS_STATE_SCHEMA)		\
+    X(usr,   USR_SCHEMA)		\
+    X(sys_state,  SYS_STATE_SCHEMA)	\
     X(password,  PASSWORD_SCHEMA)		
 
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 #define SYS_STATE_SCHEMA				\
-    TCV(SYS_STATE_C,  admin_uid, u16, INTEGER, DF(1))	\
-    TCV(SYS_STATE_C,  boat_id,   u16, INTEGER, DF(100))	\
-    TCVL(SYS_STATE_C, cust_uid,  u16, INTEGER, DF(100))	
+    TCV(sys_state_col,  admin_uid, u16, INTEGER, DF(1))	\
+    TCV(sys_state_col,  boat_id,   u16, INTEGER, DF(100))	\
+    TCVL(sys_state_col, cust_uid,  u16, INTEGER, DF(100))	
 
-#define PASSWORD_SCHEMA					\
-    TCV(USR_C,  rid,   u16, INTEGER, PK)		\
-    TCV(USR_C,  uid,   u16, INTEGER, PK)		\
-    TCVL(USR_C,  pw_hash, pass_t, TEXT, NN UQ  )	\
+
+#define PASSWORD_SCHEMA				\
+    TCV(PW_C,  rid,   u16, INTEGER, PK)		\
+    TCV(PW_C,  uid,   u16, INTEGER, PK)		\
+    TCVL(PW_C, pw_hash, pass_t, TEXT, NN UQ  )	\
 
 #define USR_SCHEMA					\
     TCV(USR_C,  rid,   u16, INTEGER, PK)		\
@@ -382,34 +384,36 @@ struct db_table db_schema[32] = {
 /* Schema derived enums. */
 #define TCV(tbl, name, ctype, type, ...)  tbl##_##name,
 #define TCVL(tbl, name, ctype,type,  ...) tbl##_##name,
-#define TCOLS(name, tbl) enum name { tbl name##_CNT };
+#define TCOLS(name, tbl) enum name##enum { tbl name##_CNT };
+#define X(name, tbl) enum name##_cols { tbl name##_cols_CNT };
 
-#define X(tbl, SCHEMA)
-TCOLS(USR_COL, USR_SCHEMA)
-TCOLS(SYS_STATE_COL, SYS_STATE_SCHEMA)
+DB_TABLES
 
 #undef TCV
 #undef TCVL
+#undef X
 
 /* Schema derived structs. */
 #define TCV(tbl, name, ctype, type, ...) ctype name;
 #define TCVL(tbl, name, ctype,type,  ...) ctype name;
-#define STRUCT_REC(name, tbl) struct name {tbl};
+#define STRUCT_REC(name, tbl) struct name##_rec {tbl};
+#define X(name, tbl) struct name##_rec {tbl};
 
-STRUCT_REC(usr_rec, USR_SCHEMA)
-STRUCT_REC(sys_state_rec, SYS_STATE_SCHEMA)
+DB_TABLES
 
 #undef TCV
 #undef TCVL
-
+#undef X
 /* Schema derived strings. */
 #define TCV(tbl, name, ctype, type, ...) #name,
-#define TCVL(tbl, name, ctype,type,  ...) #name,
-const char *usr_table_strings[] = {USR_SCHEMA};
+#define TCVL(tbl, name, ctype,type,  ...) #name
+#define X(name, SCHEMA) const char *name##_table_strings[] = {SCHEMA};
+
+DB_TABLES
 
 #undef TCV
 #undef TCVL
-
+#undef X
 
 #if 0
 /* ***** SCHEMA DERIVED CRUD STATEMENTS GLOBAL DECLARATIONS ***** */
@@ -489,21 +493,22 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
 }
 
 /* user statemetns */
-sqlite3_stmt *insert_new_user_stmt = NULL;
-sqlite3_stmt *delete_user_stmt = NULL;
-sqlite3_stmt *update_user_stmt = NULL;
-sqlite3_stmt *get_all_users_stmt = NULL;
+sqlite3_stmt *insert_usr_stmt = NULL;
+sqlite3_stmt *delete_usr_stmt = NULL;
+sqlite3_stmt *update_usr_stmt = NULL;
+sqlite3_stmt *getall_usr_stmt = NULL;
 
-int insert_new_user(sqlite3 *db, struct usr_rec *usr) {
-    if(!insert_new_user_stmt) {
-	insert_new_user_stmt = create_statement(db,
-						"INSERT INTO users"
+
+int insert_new_usr(sqlite3 *db, struct usr_rec *usr) {
+    if(!insert_usr_stmt) {
+	insert_usr_stmt = create_statement(db,
+						"INSERT INTO usr"
 						"(uid, email, phone, first, last)"
 						"VALUES (?, ?, ?, ?, ?)"
 						);
     }
 
-    sqlite3_stmt *stmt = insert_new_user_stmt;
+    sqlite3_stmt *stmt = insert_usr_stmt;
 	
     sqlite3_bind_int(stmt,  1, usr->uid);
     sqlite3_bind_text(stmt, 2, usr->email, -1, SQLITE_STATIC);
@@ -526,13 +531,13 @@ struct all_users {
     struct usr_rec rec[4096];
 };
 
-int get_all_user_recs(sqlite3 *db,struct all_users *usr ) {
+int getall_usr_rec(sqlite3 *db,struct all_users *usr ) {
 
-    if(!get_all_users_stmt) {
-	get_all_users_stmt = create_statement(db, "select * from users");
+    if(!getall_usr_stmt) {
+	getall_usr_stmt = create_statement(db, "select * from usr");
     }
     
-    sqlite3_stmt *stmt = get_all_users_stmt;
+    sqlite3_stmt *stmt = getall_usr_stmt;
 
     int i = 0;
     while(sqlite3_step(stmt) == SQLITE_ROW) {
@@ -544,7 +549,29 @@ int get_all_user_recs(sqlite3 *db,struct all_users *usr ) {
 	i++;
     }
     usr->len = i;
+    
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
     return 1;
+}
+
+int update_usr(sqlite3 *db, struct usr_rec *usr) {
+    if(!update_usr_stmt) {
+	update_usr_stmt = create_statement(db,
+					   "UPDATE usr"
+					   "(uid, email, phone, first, last)"
+					   "VALUES (?, ?, ?, ?, ?)"
+					   );
+    }
+        sqlite3_stmt *stmt = insert_usr_stmt;
+	
+    sqlite3_bind_int(stmt,  1, usr->uid);
+    sqlite3_bind_text(stmt, 2, usr->email, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, usr->phone, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, usr->first, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 5, usr->last,  -1, SQLITE_STATIC);
+    
+    return 0;
 }
 
 /* UPDATE users */
@@ -563,6 +590,7 @@ void create_tables() {
 	if(db_schema[i].creat){
 	    if(DEV_MODE) {
 		sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL);
+		printf("dropped table %s\n", db_schema[i].drop);
 		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
 	    } else {
 		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
@@ -600,14 +628,14 @@ struct usr_rec create_usr_rec (int uid, char *email, char *phone, char *first, c
 }
 
 void add_user_test(sqlite3 *db) {
-    struct usr_rec r1 = create_usr_rec(1,"ari@marina59.com", "7186462748","ari", "zablozki");
-    insert_new_user(db,&r1);
+    struct usr_rec r1 = create_usr_rec(0,"ari@marina59.com", "6462694084","ari", "zablozki");
+    insert_new_usr(db,&r1);
 }
 
 void view_users_test(sqlite3 *db) {
     struct all_users all;
     all.len = 0;
-    get_all_user_recs(db, &all);
+    getall_usr_rec(db, &all);
     for (int i = 0; i < all.len; i++) {
 	printf("%d %s %s %s %s\n",
 	       all.rec[i].uid,
