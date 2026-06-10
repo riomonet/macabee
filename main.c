@@ -330,12 +330,11 @@ typedef char e164_t[17];
 typedef char pass_t[crypto_pwhash_STRBYTES];
 
 
-#define DB_TABLES	     \
-    X(usr,       USR_SCHEMA) \
-    X(sys_state, SYS_STATE_SCHEMA) \
-    X(boat,      BOAT_SCHEMA) \
-    X(slip,      SLIP_SCHEMA) \
-    X(invoice,   INVOICE_SCHEMA)
+#define DB_TABLES				\
+    X(users,     USR_SCHEMA)			\
+    X(sys_state, SYS_STATE_SCHEMA)		\
+    X(password,  PASSWORD_SCHEMA)		
+
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 #define SYS_STATE_SCHEMA				\
@@ -343,16 +342,19 @@ typedef char pass_t[crypto_pwhash_STRBYTES];
     TCV(SYS_STATE_C,  boat_id,   u16, INTEGER, DF(100))	\
     TCVL(SYS_STATE_C, cust_uid,  u16, INTEGER, DF(100))	
 
+#define PASSWORD_SCHEMA					\
+    TCV(USR_C,  rid,   u16, INTEGER, PK)		\
+    TCV(USR_C,  uid,   u16, INTEGER, PK)		\
+    TCVL(USR_C,  pw_hash, pass_t, TEXT, NN UQ  )	\
 
 #define USR_SCHEMA					\
-    TCV(USR_C,  rid,   u16, int, PK)		\
-    TCV(USR_C,  uid,   u16, int, NN UQ)		\
-    TCV(USR_C,  rmid,  u16, int, NN UQ)		\
-    TCV(USR_C,  email, email_t, text, NN UQ)		\
-    TCV(USR_C,  phone, e164_t, text, NN UQ)		\
-    TCV(USR_C,  pw_hash, pass_t, text, NN UQ  )		\
-    TCV(USR_C, first, name_t, text)			\
-    TCVL(USR_C, last, name_t, text)			
+    TCV(USR_C,  rid,   u16, INTEGER, PK)		\
+    TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
+    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
+    TCV(USR_C,  phone, e164_t, TEXT, NN UQ)		\
+    TCV(USR_C, first, name_t, TEXT)			\
+    TCVL(USR_C, last, name_t, TEXT)			
+
 
     /* NOTE:(ari) Add phone as text in e.164 format  */
 
@@ -367,11 +369,13 @@ struct db_table {
     const char *drop;
 };
 
+#define X(tbl, SCHEMA) {SQL_CREAT(tbl,SCHEMA),SQL_DROP(tbl)},
+
 struct db_table db_schema[32] = {
-	{SQL_CREAT(players,USR_SCHEMA),SQL_DROP(players)},
-	{SQL_CREAT(sys_state,SYS_STATE_SCHEMA),SQL_DROP(sys_state)},
+    DB_TABLES
 };
 
+#undef X
 #undef TCV
 #undef TCVL
 
@@ -380,6 +384,7 @@ struct db_table db_schema[32] = {
 #define TCVL(tbl, name, ctype,type,  ...) tbl##_##name,
 #define TCOLS(name, tbl) enum name { tbl name##_CNT };
 
+#define X(tbl, SCHEMA)
 TCOLS(USR_COL, USR_SCHEMA)
 TCOLS(SYS_STATE_COL, SYS_STATE_SCHEMA)
 
@@ -402,24 +407,61 @@ STRUCT_REC(sys_state_rec, SYS_STATE_SCHEMA)
 #define TCVL(tbl, name, ctype,type,  ...) #name,
 const char *usr_table_strings[] = {USR_SCHEMA};
 
-
-/* INSERT INTO users */
-/* (uid, email, phone) */
-/* VALUES (?, ?, ?) */
-
-/* UPDATE users */
-/* SET email = ?, phone = ? */
-/* WHERE rid = ? */
-
-/* DELETE FROM users */
-/* WHERE rid = ? */
+#undef TCV
+#undef TCVL
 
 
+#if 0
+/* ***** SCHEMA DERIVED CRUD STATEMENTS GLOBAL DECLARATIONS ***** */
+/* Get */
+#define TCV(tbl, name, ctype, type, ...) sqlite3_stmt *get_##tbl##_by_##name##_stmt;
+#define TCVL(tbl, name, ctype,type,  ...) sqlite3_stmt *get_##tbl##_by_##name##_stmt;
+#define CRUD_GET_STMT(name, tbl) tbl
+
+CRUD_GET_STMT(usr,USR_SCHEMA)
+CRUD_GET_STMT(sys_state,SYS_STATE_SCHEMA)
+
+#undef TCV
+#undef TCVL
+
+#define TCV(tbl, name, ctype, type, ...)  \
+get_##tbl##_by_##name##_stmt = create_statment(db,"select * from " #tbl " where " #name " = ?");
+
+#define TCVL(tbl, name, ctype,type,  ...) \
+get_##tbl##_by_##name##_stmt =  create_statment(db,"select * from " #tbl " where " #name " = ?");
+
+#define CRUD_INIT_FUNCTION_GET_STMT(name,tbl) \
+int init_get_stmts(sqlite3* db) {tbl}
+
+CRUD_INIT_FUNCTION_GET_STMT(usr,USR_SCHEMA)
+
+#undef TCV
+#undef TCVL
 
 
+#define BIND_text(stmt) sqlite3_bind_text(stmt, 1,(char *)val, -1 , SQLITE_STATIC);
+#define BIND_int(stmt)	sqlite3_bind_int(stmt, 1, *(int*)val);
 
+#define get_col_int(tbl,name, ctype, type, ...)  tbl->name = sqlite3_column_int(stmt, tbl##_##name));
+#define get_col_text(tbl,name, ctype, type, ...) strcpy(tbl->name,(const char*)sqlite3_column_text(stmt, tbl##_##name));
 
+#define TCV(tbl, name, ctype, type, ...)    get_col_##type(tbl,name, ctype, type, ...)
+#define TCVL(tbl, name, ctype, type, ...)   get_col_##type(tbl,name, ctype, type, ...)
 
+USR_SCHEMA
+
+#undef TCV
+#undef TCVL
+
+#define TCV(tbl, name, ctype, type, ...)		\
+    int get_##tbl_by_##name(void *val) {		\
+	BIND_##type(get_##tbl##_by_##name##_stmt)	\
+	    }
+
+#define TCVL(tbl, name, ctype,type,  ...)      
+USR_SCHEMA
+
+#endif
 
 #undef TCV
 #undef TCVL
@@ -434,6 +476,10 @@ const char *usr_table_strings[] = {USR_SCHEMA};
 
 
 /* ---------------------------------QUERIES------------------------------------------------------------ */
+// create statment
+// bind
+// fillout struct and step, or, step and fill out struct.
+
 #define SQLITE_READ_TO_NUL -1
 
 sqlite3_stmt *create_statement(sqlite3 *db, char *q) { 
@@ -442,94 +488,72 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
     return stmt;
 }
 
-struct usr_query {
-    sqlite3_stmt *gusr[USR_COL_CNT];
-    sqlite3_stmt *ausr;
-    sqlite3_stmt *uusr[USR_COL_CNT];
-    sqlite3_stmt *dusr;
-};
+/* user statemetns */
+sqlite3_stmt *insert_new_user_stmt = NULL;
+sqlite3_stmt *delete_user_stmt = NULL;
+sqlite3_stmt *update_user_stmt = NULL;
+sqlite3_stmt *get_all_users_stmt = NULL;
 
-struct usr_query usr_queries;
-
-struct usr_query init_queries(sqlite3 *db) {
-    struct usr_query uq;
-    
-    for (int i = 0; i < USR_COL_CNT; i++) {
-	char sql_txt[128];
-	snprintf(sql_txt, 128,"select * from users where %s = ?", usr_table_strings[i]);
-	uq.gusr[i] = create_statement(db, sql_txt);
+int insert_new_user(sqlite3 *db, struct usr_rec *usr) {
+    if(!insert_new_user_stmt) {
+	insert_new_user_stmt = create_statement(db,
+						"INSERT INTO users"
+						"(uid, email, phone, first, last)"
+						"VALUES (?, ?, ?, ?, ?)"
+						);
     }
-    
-    char *insert  = "INSERT INTO users "
-	"(uid, rmid, email, phone, first, last, pw_hash)"
-	"VALUES (?, ?, ?, ?, ?, ?, ?)";
-    
-    uq.ausr = create_statement(db,insert);
 
-    return uq;
-}
-
-int ausr(struct usr_rec *usr) {
-    sqlite3_stmt *stmt = usr_queries.ausr;
-    
-    sqlite3_bind_int(stmt,  1, usr->uid);
-    sqlite3_bind_int(stmt,  2, usr->rmid);
-    sqlite3_bind_text(stmt, 3, usr->email, -1 , SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, usr->phone, -1 , SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, usr->first, -1 , SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 6, usr->last,  -1 , SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 6, usr->pw_hash,  -1 , SQLITE_STATIC);
-
-    int res = sqlite3_step(stmt);
-    (void)res;
+    sqlite3_stmt *stmt = insert_new_user_stmt;
 	
-    return 1;
-}
+    sqlite3_bind_int(stmt,  1, usr->uid);
+    sqlite3_bind_text(stmt, 2, usr->email, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, usr->phone, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, usr->first, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 5, usr->last,  -1, SQLITE_STATIC);
 
-/* fills in (array or single) 'usr_rec' for query typ */
-int gusr(u8 typ, void *val, struct usr_rec *usr) {
-    int success = 0;
-    sqlite3_stmt *stmt = usr_queries.gusr[typ];
-
-    /* Then just get pw_hash by USR_C_email */
-    if (typ == USR_C_pw_hash) {
-	sqlite3_bind_text(stmt, 1,(char *)val, -1 , SQLITE_STATIC);
-	if (sqlite3_step(stmt) == SQLITE_ROW) {
-	    strcpy(usr->pw_hash,  (const char*)sqlite3_column_text(stmt, USR_C_last));
-	    return 1;
-	} else {
-	    return 0;
-	}
-    }
-    
-    switch (typ) {
-    case USR_C_uid:
-    case USR_C_rmid:
-	sqlite3_bind_int(stmt, 1, *(int*)val);
-	break;
-
-    case USR_C_email:
-    case USR_C_phone:
-    case USR_C_first:
-    case USR_C_last:
-	 sqlite3_bind_text(stmt, 1,(char *)val, -1 , SQLITE_STATIC);
-	break;
-    }
-    
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-	usr->uid = sqlite3_column_int(stmt,USR_C_uid);
-	usr->rmid = sqlite3_column_int(stmt,USR_C_rmid);
-	strcpy(usr->email, (const char*)sqlite3_column_text(stmt, USR_C_email));
-	strcpy(usr->phone, (const char*)sqlite3_column_text(stmt, USR_C_phone));
-	strcpy(usr->first, (const char*)sqlite3_column_text(stmt, USR_C_first));
-	strcpy(usr->last,  (const char*)sqlite3_column_text(stmt, USR_C_last));
-
-	success = 1;
+    int INSERT_OK = sqlite3_step(stmt);
+    if (INSERT_OK != SQLITE_DONE) {
+	fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+	return 0;
     }
     sqlite3_reset(stmt);
     sqlite3_clear_bindings(stmt);
-    return success;
+    return 1;    
 }
+
+struct all_users {
+    int len;
+    struct usr_rec rec[4096];
+};
+
+int get_all_user_recs(sqlite3 *db,struct all_users *usr ) {
+
+    if(!get_all_users_stmt) {
+	get_all_users_stmt = create_statement(db, "select * from users");
+    }
+    
+    sqlite3_stmt *stmt = get_all_users_stmt;
+
+    int i = 0;
+    while(sqlite3_step(stmt) == SQLITE_ROW) {
+	usr->rec[i].uid = sqlite3_column_int(stmt,USR_C_uid);
+	strcpy(usr->rec[i].email, (const char*)sqlite3_column_text(stmt, USR_C_email));
+	strcpy(usr->rec[i].phone, (const char*)sqlite3_column_text(stmt, USR_C_phone));
+	strcpy(usr->rec[i].first, (const char*)sqlite3_column_text(stmt, USR_C_first));
+	strcpy(usr->rec[i].last,  (const char*)sqlite3_column_text(stmt, USR_C_last));
+	i++;
+    }
+    usr->len = i;
+    return 1;
+}
+
+/* UPDATE users */
+/* SET email = ?, phone = ? */
+/* WHERE uid = ? */
+
+/* DELETE FROM users */
+/* WHERE uid = ? */
+
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
 
@@ -555,6 +579,44 @@ void init_db() {
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
 }
 
+
+struct usr_rec create_usr_rec (int uid, char *email, char *phone, char *first, char *last) {
+
+    if (!email) email = "";
+    if (!phone) phone = "";
+    if (!first) first = "";
+    if (!last)  last = "";
+
+    struct usr_rec rec = {
+	.uid = uid,
+    };
+
+    strcpy(rec.email,email);
+    strcpy(rec.phone,phone);
+    strcpy(rec.first,first);
+    strcpy(rec.last,last);
+
+    return rec;
+}
+
+void add_user_test(sqlite3 *db) {
+    struct usr_rec r1 = create_usr_rec(1,"ari@marina59.com", "7186462748","ari", "zablozki");
+    insert_new_user(db,&r1);
+}
+
+void view_users_test(sqlite3 *db) {
+    struct all_users all;
+    all.len = 0;
+    get_all_user_recs(db, &all);
+    for (int i = 0; i < all.len; i++) {
+	printf("%d %s %s %s %s\n",
+	       all.rec[i].uid,
+	       all.rec[i].email,
+	       all.rec[i].phone,
+	       all.rec[i].first,
+	       all.rec[i].last);
+    }
+}
 
 /* ============================     END DB          ============================================= */
 
@@ -615,19 +677,20 @@ void try_login(struct player *player, u8 *reqbuf) {
     struct cfb *user = (struct cfb*) input_fld;  
     struct cfb *pass = (struct cfb*) (input_fld + sizeof(*user));
 
+    (void) pass;
     /* Check the db for email_address is there.*/
     struct usr_rec usr_rec;
-    int usr_found = gusr(USR_C_pw_hash, (void *)user->val, &usr_rec);
+    (void) usr_rec;
+    //    int usr_found = gusr(USR_C_pw_hash, (void *)user->val, &usr_rec);
 
-    if(usr_found) {
-	int verified = crypto_pwhash_str_verify(usr_rec.pw_hash, pass->val, pass->len);
-	(void)verified;
-    }
-    else {
+    /* if(usr_found) { */
+    /* 	int verified = crypto_pwhash_str_verify(usr_rec.pw_hash, pass->val, pass->len); */
+    /* 	(void)verified; */
+    /* } */
+    /* else { */
 	
-    }
+    /* } */
 }
-
 
 
 /* Dispatch Business Logic */
@@ -705,16 +768,18 @@ int main(void) {
     
     init_db();
     create_tables();
-    usr_queries = init_queries(db);
+    add_user_test(db);
+    view_users_test(db);
+	
 
-    struct mg_mgr mgr;
-    mg_mgr_init(&mgr);
-    mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
+    /* struct mg_mgr mgr; */
+    /* mg_mgr_init(&mgr); */
+    /* mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL); */
 
-    for(;;) {
-	mg_mgr_poll(&mgr,1000);
-     }
-    return 0;
+    /* for(;;) { */
+    /* 	mg_mgr_poll(&mgr,1000); */
+    /*  } */
+    /* return 0; */
     sqlite3_close(db);
 }
 
