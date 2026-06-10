@@ -304,10 +304,7 @@ void render_screen_template(struct player *player, u8 SCREEN) {
     mb_send(player, &screens[SCREEN]);    
 }
 
-/* ===============================DATABASE   ====================================== */
-
-/* ---------------- SQL DSL FOR INITIALIZING DB and CREATING TABLES --------------- */
-
+/* =============================== DATABASE DSL ====================================== */
 
 sqlite3 *db;
 
@@ -317,7 +314,6 @@ sqlite3 *db;
 #define SQLITE_SET_PRAGMA(mode,val) sqlite3_exec(db,"PRAGMA " #mode "=" STR(val), NULL, NULL, NULL)
 
 /* --------------------------------- SCHEMA --------------------------------------- */
-
 
 #define x20 " "
 #define COMMA ","
@@ -334,19 +330,31 @@ typedef char e164_t[17];
 typedef char pass_t[crypto_pwhash_STRBYTES];
 
 
+#define DB_TABLES	     \
+    X(usr,       USR_SCHEMA) \
+    X(sys_state, SYS_STATE_SCHEMA) \
+    X(boat,      BOAT_SCHEMA) \
+    X(slip,      SLIP_SCHEMA) \
+    X(invoice,   INVOICE_SCHEMA)
+
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
+#define SYS_STATE_SCHEMA				\
+    TCV(SYS_STATE_C,  admin_uid, u16, INTEGER, DF(1))	\
+    TCV(SYS_STATE_C,  boat_id,   u16, INTEGER, DF(100))	\
+    TCVL(SYS_STATE_C, cust_uid,  u16, INTEGER, DF(100))	
+
+
 #define USR_SCHEMA					\
-    TCV(USR_C,  rid,   u16, INTEGER, PK)		\
-    TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
-    TCV(USR_C,  rmid,  u16, INTEGER, NN UQ)		\
-    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
-    TCV(USR_C,  phone, e164_t, TEXT, NN UQ)		\
-    TCV(USR_C,  pw_hash, pass_t, TEXT, NN UQ  )		\
-    TCV(USR_C, first, name_t, TEXT)			\
-    TCVL(USR_C, last, name_t, TEXT)			
+    TCV(USR_C,  rid,   u16, int, PK)		\
+    TCV(USR_C,  uid,   u16, int, NN UQ)		\
+    TCV(USR_C,  rmid,  u16, int, NN UQ)		\
+    TCV(USR_C,  email, email_t, text, NN UQ)		\
+    TCV(USR_C,  phone, e164_t, text, NN UQ)		\
+    TCV(USR_C,  pw_hash, pass_t, text, NN UQ  )		\
+    TCV(USR_C, first, name_t, text)			\
+    TCVL(USR_C, last, name_t, text)			
 
     /* NOTE:(ari) Add phone as text in e.164 format  */
-
 
 /* Schema derived db tables. */
 #define TCV(tbl,  name, ctype, type, ...) #name x20 #type  __VA_ARGS__ COMMA
@@ -361,6 +369,7 @@ struct db_table {
 
 struct db_table db_schema[32] = {
 	{SQL_CREAT(players,USR_SCHEMA),SQL_DROP(players)},
+	{SQL_CREAT(sys_state,SYS_STATE_SCHEMA),SQL_DROP(sys_state)},
 };
 
 #undef TCV
@@ -372,6 +381,7 @@ struct db_table db_schema[32] = {
 #define TCOLS(name, tbl) enum name { tbl name##_CNT };
 
 TCOLS(USR_COL, USR_SCHEMA)
+TCOLS(SYS_STATE_COL, SYS_STATE_SCHEMA)
 
 #undef TCV
 #undef TCVL
@@ -382,6 +392,7 @@ TCOLS(USR_COL, USR_SCHEMA)
 #define STRUCT_REC(name, tbl) struct name {tbl};
 
 STRUCT_REC(usr_rec, USR_SCHEMA)
+STRUCT_REC(sys_state_rec, SYS_STATE_SCHEMA)
 
 #undef TCV
 #undef TCVL
@@ -389,8 +400,25 @@ STRUCT_REC(usr_rec, USR_SCHEMA)
 /* Schema derived strings. */
 #define TCV(tbl, name, ctype, type, ...) #name,
 #define TCVL(tbl, name, ctype,type,  ...) #name,
-
 const char *usr_table_strings[] = {USR_SCHEMA};
+
+
+/* INSERT INTO users */
+/* (uid, email, phone) */
+/* VALUES (?, ?, ?) */
+
+/* UPDATE users */
+/* SET email = ?, phone = ? */
+/* WHERE rid = ? */
+
+/* DELETE FROM users */
+/* WHERE rid = ? */
+
+
+
+
+
+
 
 
 #undef TCV
@@ -417,6 +445,8 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
 struct usr_query {
     sqlite3_stmt *gusr[USR_COL_CNT];
     sqlite3_stmt *ausr;
+    sqlite3_stmt *uusr[USR_COL_CNT];
+    sqlite3_stmt *dusr;
 };
 
 struct usr_query usr_queries;
@@ -441,7 +471,7 @@ struct usr_query init_queries(sqlite3 *db) {
 
 int ausr(struct usr_rec *usr) {
     sqlite3_stmt *stmt = usr_queries.ausr;
-
+    
     sqlite3_bind_int(stmt,  1, usr->uid);
     sqlite3_bind_int(stmt,  2, usr->rmid);
     sqlite3_bind_text(stmt, 3, usr->email, -1 , SQLITE_STATIC);
@@ -455,7 +485,6 @@ int ausr(struct usr_rec *usr) {
 	
     return 1;
 }
-
 
 /* fills in (array or single) 'usr_rec' for query typ */
 int gusr(u8 typ, void *val, struct usr_rec *usr) {
