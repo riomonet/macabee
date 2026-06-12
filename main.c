@@ -4,6 +4,11 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sodium.h>
+#include <assert.h>
+#include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
+
 
 #include "mac_types.h"
 #include "mongoose.h"
@@ -306,7 +311,7 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 
 /* =============================== DATABASE DSL ====================================== */
 
-sqlite3 *db;
+
 
 #define SQLITE_JOURNAL_MODE wal
 #define SQLITE_SYNC normal
@@ -318,43 +323,48 @@ sqlite3 *db;
 #define x20 " "
 #define COMMA ","
 
+
 /* column constraints */
 #define PK x20 "PRIMARY KEY"
 #define NN x20 "NOT NULL"
 #define UQ x20 "UNIQUE"
 #define DF(dval) x20 "DEFAULT" x20 #dval
 
-typedef char name_t[25]; 
-typedef char email_t[25];
-typedef char e164_t[17];
-typedef char pass_t[crypto_pwhash_STRBYTES];
+
+#define NAME_T 25
+#define EMAIL_T 25
+#define E164_T 17 //phone
+#define PW_HASH_T crypto_pwhash_STRBYTES
+
+typedef char name_t  [NAME_T]; 
+typedef char email_t [EMAIL_T];
+typedef char e164_t  [E164_T];
+typedef char pw_t[PW_HASH_T];
 
 
 /* TABLE INDEX */
-#define DB_TABLES				\
-    X(usr,   USR_SCHEMA)		\
-    X(sys_state,  SYS_STATE_SCHEMA)	\
-    X(password,  PASSWORD_SCHEMA)		
+#define DB_TABLES                               \
+    X(usr,   USR_SCHEMA)                        \
+        X(sys_state,  SYS_STATE_SCHEMA)         \
+        X(pw,  PW_SCHEMA)		
 
+  /*  */
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
-#define SYS_STATE_SCHEMA				\
-    TCV(sys_state_col,  admin_uid, u16, INTEGER, DF(1))	\
+#define SYS_STATE_SCHEMA                                    \
+    TCV(sys_state_col,  admin_uid, u16, INTEGER, DF(1))     \
     TCV(sys_state_col,  boat_id,   u16, INTEGER, DF(100))	\
     TCVL(sys_state_col, cust_uid,  u16, INTEGER, DF(100))	
 
+#define PW_SCHEMA                               \
+    TCV(PW_C,  uid,  u16,  INTEGER, NN UQ)      \
+    TCVL(PW_C, hash, pw_t, TEXT,    NN   )	
 
-#define PASSWORD_SCHEMA				\
-    TCV(PW_C,  rid,   u16, INTEGER, PK)		\
-    TCV(PW_C,  uid,   u16, INTEGER, PK)		\
-    TCVL(PW_C, pw_hash, pass_t, TEXT, NN UQ  )	\
-
-#define USR_SCHEMA					\
-    TCV(USR_C,  rid,   u16, INTEGER, PK)		\
+#define USR_SCHEMA                              \
     TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
-    TCV(USR_C,  email, email_t, TEXT, NN UQ)		\
+    TCV(USR_C,  email, email_t, TEXT, NN UQ)    \
     TCV(USR_C,  phone, e164_t, TEXT, NN UQ)		\
-    TCV(USR_C, first, name_t, TEXT)			\
+    TCV(USR_C, first, name_t, TEXT)             \
     TCVL(USR_C, last, name_t, TEXT)			
 
 
@@ -479,7 +489,7 @@ USR_SCHEMA
 #undef TBCL_FK
 
 
-/* ---------------------------------QUERIES------------------------------------------------------------ */
+/* ---------------------------------  CRUD QUERIES    ------------------------------------------------------------ */
 // create statment
 // bind
 // fillout struct and step, or, step and fill out struct.
@@ -488,18 +498,71 @@ USR_SCHEMA
 
 sqlite3_stmt *create_statement(sqlite3 *db, char *q) { 
     sqlite3_stmt *stmt;
-    sqlite3_prepare_v2(db, q, SQLITE_READ_TO_NUL, &stmt,NULL);
+    int rc =  sqlite3_prepare_v2(db, q, SQLITE_READ_TO_NUL, &stmt,NULL);
+    if(rc != SQLITE_OK) {
+        fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+        exit(1);
+    }
     return stmt;
 }
 
-/* user statemetns */
+/* PW crud */
+sqlite3_stmt *create_pw_stmt = NULL;
+sqlite3_stmt *read_pw_stmt = NULL;   //where uid = ?
+
+
+
+int create_pw (sqlite3 *db, struct pw_rec *pw) {
+    if(!create_pw_stmt) {
+	create_pw_stmt = create_statement(db,
+						"INSERT INTO pw"
+						"(uid, hash)"
+						"VALUES (?, ?)"
+						);
+    }
+    sqlite3_stmt *stmt = create_pw_stmt;
+
+	
+    sqlite3_bind_int(stmt,  1, pw->uid);
+    sqlite3_bind_text(stmt, 2, pw->hash, -1, SQLITE_STATIC);
+
+    int INSERT_OK = sqlite3_step(stmt);
+    if (INSERT_OK != SQLITE_DONE) {
+	fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+	return 0;
+    }
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
+    return 1;    
+}
+
+int read_pw (sqlite3 *db, struct pw_rec *pw) {
+    int found = 0;
+    if(!read_pw_stmt) {
+        read_pw_stmt = create_statement(db, "select hash from pw where uid = ?");
+    }
+    
+    sqlite3_stmt *stmt = read_pw_stmt;
+    sqlite3_bind_int(stmt,  1, pw->uid);
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *hash = (const char *)sqlite3_column_text(stmt, 0);
+        strcpy(pw->hash, hash);
+        found = 1;
+    }
+    
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
+    return found;
+}
+
+/* USR crud */
 sqlite3_stmt *insert_usr_stmt = NULL;
 sqlite3_stmt *delete_usr_stmt = NULL;
 sqlite3_stmt *update_usr_stmt = NULL;
 sqlite3_stmt *getall_usr_stmt = NULL;
 
-
-int insert_new_usr(sqlite3 *db, struct usr_rec *usr) {
+int create_usr(sqlite3 *db, struct usr_rec *usr) {
     if(!insert_usr_stmt) {
 	insert_usr_stmt = create_statement(db,
 						"INSERT INTO usr"
@@ -531,7 +594,8 @@ struct all_users {
     struct usr_rec rec[4096];
 };
 
-int getall_usr_rec(sqlite3 *db,struct all_users *usr ) {
+
+int read_usr_all(sqlite3 *db,struct all_users *usr ) {
 
     if(!getall_usr_stmt) {
 	getall_usr_stmt = create_statement(db, "select * from usr");
@@ -585,12 +649,11 @@ int update_usr(sqlite3 *db, struct usr_rec *usr) {
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
 
 #define DEV_MODE 1
-void create_tables() {
+void create_tables(sqlite3 *db) {
     for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
 	if(db_schema[i].creat){
 	    if(DEV_MODE) {
 		sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL);
-		printf("dropped table %s\n", db_schema[i].drop);
 		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
 	    } else {
 		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
@@ -599,16 +662,17 @@ void create_tables() {
     }
 }
 
-void init_db() {
+sqlite3 *init_db() {
+    sqlite3 *db;
     int rc = sqlite3_open("mb_data.db",&db);
     (void) rc;
     SQLITE_SET_PRAGMA(journal_mode, SQLITE_JOURNAL_MODE);
     SQLITE_SET_PRAGMA(synchronous, SQLITE_SYNC);
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
+    return db;
 }
 
-
-struct usr_rec create_usr_rec (int uid, char *email, char *phone, char *first, char *last) {
+struct usr_rec new_usr_rec (int uid, char *email, char *phone, char *first, char *last) {
 
     if (!email) email = "";
     if (!phone) phone = "";
@@ -627,15 +691,42 @@ struct usr_rec create_usr_rec (int uid, char *email, char *phone, char *first, c
     return rec;
 }
 
-void add_user_test(sqlite3 *db) {
-    struct usr_rec r1 = create_usr_rec(0,"ari@marina59.com", "6462694084","ari", "zablozki");
-    insert_new_usr(db,&r1);
+
+void add_usr_to_db(sqlite3 *db, int uid, char *email, char *phone, char *first, char *last) {
+    
+    struct usr_rec rec = new_usr_rec(uid, email, phone, first, last);
+    create_usr(db,&rec);
 }
+
+
+void pw_encrypt_and_add_to_db(sqlite3 *db, int uid, char *clr_pw) {
+    struct pw_rec pw;
+    pw.uid = uid;
+    if (crypto_pwhash_str ((char*)pw.hash,
+                           clr_pw, strlen(clr_pw),
+                           crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                           crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        perror("FAILED TO HASH PASSWORD");
+        exit(1); //TODO: How should I handle this case???
+    }
+    create_pw(db, &pw);
+}
+
+/* if uid is in usr it must be in pw... */
+int pw_check_from_db(sqlite3 *db, int uid, char *clr_pw) {
+    struct pw_rec pw;
+    pw.uid = uid;
+    int res = read_pw(db, &pw);
+    (void) res;
+    int verified = crypto_pwhash_str_verify(pw.hash, clr_pw, strlen(clr_pw));
+    return verified;
+}
+
 
 void view_users_test(sqlite3 *db) {
     struct all_users all;
     all.len = 0;
-    getall_usr_rec(db, &all);
+    read_usr_all(db, &all);
     for (int i = 0; i < all.len; i++) {
 	printf("%d %s %s %s %s\n",
 	       all.rec[i].uid,
@@ -648,24 +739,8 @@ void view_users_test(sqlite3 *db) {
 
 /* ============================     END DB          ============================================= */
 
-
 /* -----------------------------  Business Rules    --------------------------------------------- */
 
-struct pwd {
-    char hash[crypto_pwhash_STRBYTES];
-};
-
-struct pwd mb_hash_password(char *pw) {
-    struct pwd pwd;
-    if (crypto_pwhash_str (pwd.hash,
-			   pw, strlen(pw),
-			   crypto_pwhash_OPSLIMIT_SENSITIVE,
-			   crypto_pwhash_MEMLIMIT_SENSITIVE) != 0) {
-	perror("FAILED TO HASH PASSWORD");
-	exit(1); //TODO: How should I handle this case???
-    }
-    return pwd;
-}
 
 /* client req header item */
 struct __attribute__((packed)) cfh {
@@ -712,7 +787,7 @@ void try_login(struct player *player, u8 *reqbuf) {
     //    int usr_found = gusr(USR_C_pw_hash, (void *)user->val, &usr_rec);
 
     /* if(usr_found) { */
-    /* 	int verified = crypto_pwhash_str_verify(usr_rec.pw_hash, pass->val, pass->len); */
+    /* 	int verified = */
     /* 	(void)verified; */
     /* } */
     /* else { */
@@ -792,13 +867,62 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 
+void clear_screen(void) {
+    printf("\033[2J\033[H");
+    fflush(stdout);
+}
+
+
+void read_password(char *buf, size_t size)
+{
+    struct termios old, new;
+
+    tcgetattr(STDIN_FILENO, &old);
+    new = old;
+
+    new.c_lflag &= ~(ECHO);   /* turn off echo */
+    tcsetattr(STDIN_FILENO, TCSANOW, &new);
+
+    fgets(buf, size, stdin);
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &old);  /* restore */
+
+    printf("\n");
+}
+
 int main(void) {
     
-    init_db();
-    create_tables();
-    add_user_test(db);
-    view_users_test(db);
-	
+    sqlite3 *db = init_db();
+    create_tables(db);
+
+    struct pw_rec pw = {.uid = 0};
+    int found = read_pw(db, &pw);
+    if (!found) {
+
+        clear_screen();
+        printf("Welcome to MACABEE,\n"
+               "This is your first run\n"
+               "Create a root user password\n"
+               "\nPassword:");
+        char pass1[32];
+        char pass2[32];
+        read_password(pass1, 32);
+        printf("Confirm password:");
+        read_password(pass2, 32);
+        if (strcmp(pass1,pass2) != 0) {
+            printf("entries do not match\n");
+            goto PWORD;
+        } else {
+            pw_encrypt_and_add_to_db(db, 0, pass1);
+        }
+    } else {
+        
+        printf("please enter root password to start application\n");
+    }
+        
+    //add_usr_to_db(db);
+
+    //view_users_test(db);
 
     /* struct mg_mgr mgr; */
     /* mg_mgr_init(&mgr); */
