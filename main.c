@@ -9,7 +9,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-
 #include "mac_types.h"
 #include "mongoose.h"
 #include "sqlite3.h"
@@ -241,7 +240,6 @@ struct player {
  * in an authorized or unauthorized state. */
 struct player *players = NULL;
 
-
 /* Add a new player to the world. The player will start in
  * an unauthenticated state on 'SCR_LOGIN'. */
 struct player *onboard_new_player(struct mg_connection *c) {
@@ -333,12 +331,12 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 
 #define NAME_T 25
 #define EMAIL_T 25
-#define E164_T 17 //phone
+#define PHONE_T 17 //phone
 #define PW_HASH_T crypto_pwhash_STRBYTES
 
 typedef char name_t  [NAME_T]; 
 typedef char email_t [EMAIL_T];
-typedef char e164_t  [E164_T];
+typedef char phone_t  [PHONE_T];
 typedef char pw_t[PW_HASH_T];
 
 
@@ -363,7 +361,7 @@ typedef char pw_t[PW_HASH_T];
 #define USR_SCHEMA                              \
     TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
     TCV(USR_C,  email, email_t, TEXT, NN UQ)    \
-    TCV(USR_C,  phone, e164_t, TEXT, NN UQ)		\
+    TCV(USR_C,  phone, phone_t, TEXT, NN UQ)		\
     TCV(USR_C, first, name_t, TEXT)             \
     TCVL(USR_C, last, name_t, TEXT)			
 
@@ -511,7 +509,6 @@ sqlite3_stmt *create_pw_stmt = NULL;
 sqlite3_stmt *read_pw_stmt = NULL;   //where uid = ?
 
 
-
 int create_pw (sqlite3 *db, struct pw_rec *pw) {
     if(!create_pw_stmt) {
 	create_pw_stmt = create_statement(db,
@@ -536,6 +533,67 @@ int create_pw (sqlite3 *db, struct pw_rec *pw) {
     return 1;    
 }
 
+sqlite3_stmt *next_uid_admin_stmt; /* Admin range is 10 < uid <= 100 */
+sqlite3_stmt *next_uid_staff_stmt; /* Staff range is 100 < uid  <= 200  */
+sqlite3_stmt *next_uid_customer_stmt;  /* customre range is 1000 < uid < U16 max */
+
+enum UID_T {
+    ADMIN_UID_T, STAFF_UID_T, CUSTOMER_UID_T
+};
+
+/* Get the MAX + 1 uid for ranges by UID_T enum 
+ *        admin    9 < uid  20
+ *        staff   99 < uid < 120
+ *    customers  999 < uid < 30000    */
+
+int next_uid(sqlite3 *db,int typ) {
+    if(!next_uid_admin_stmt)
+        next_uid_admin_stmt = create_statement(db,"select MAX(uid) "
+                                               " from usr "
+                                               "where uid > 9 and uid < 20"
+                                               );
+
+    if(!next_uid_staff_stmt)
+        next_uid_staff_stmt = create_statement(db,"select MAX(uid) "
+                                               " from usr "
+                                               "where uid > 99 and uid < 110"
+                                               );
+    if(!next_uid_customer_stmt)
+        next_uid_customer_stmt = create_statement(db,"select MAX(uid) "
+                                                  " from usr "
+                                                  "where uid > 999 and uid < 30000"
+                                                  );
+    sqlite3_stmt *stmt;
+    int uid;
+    switch (typ) {
+    case  ADMIN_UID_T:
+        stmt = next_uid_admin_stmt;
+        uid = 10;
+            break;
+    case STAFF_UID_T:
+        stmt = next_uid_staff_stmt;
+        uid = 100;
+            break;
+    case CUSTOMER_UID_T:
+        stmt = next_uid_customer_stmt;
+        uid = 1000;
+        break;
+    }
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+            uid = (sqlite3_column_int(stmt, 0) + 1);
+        }
+    } else {
+        fprintf(stderr,"sqlite3_step failed: %s", sqlite3_errmsg(db));
+    }
+    
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
+    return uid;
+}
+
+/* Search for uid and return the related hashed 'pw'. */
 int read_pw (sqlite3 *db, struct pw_rec *pw) {
     int found = 0;
     if(!read_pw_stmt) {
@@ -564,15 +622,14 @@ sqlite3_stmt *getall_usr_stmt = NULL;
 
 int create_usr(sqlite3 *db, struct usr_rec *usr) {
     if(!insert_usr_stmt) {
-	insert_usr_stmt = create_statement(db,
-						"INSERT INTO usr"
-						"(uid, email, phone, first, last)"
-						"VALUES (?, ?, ?, ?, ?)"
-						);
+        insert_usr_stmt = create_statement(db,
+                                           "INSERT INTO usr"
+                                           "(uid, email, phone, first, last)"
+                                           "VALUES (?, ?, ?, ?, ?)"
+                                           );
     }
-
+    
     sqlite3_stmt *stmt = insert_usr_stmt;
-	
     sqlite3_bind_int(stmt,  1, usr->uid);
     sqlite3_bind_text(stmt, 2, usr->email, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, usr->phone, -1, SQLITE_STATIC);
@@ -581,8 +638,9 @@ int create_usr(sqlite3 *db, struct usr_rec *usr) {
 
     int INSERT_OK = sqlite3_step(stmt);
     if (INSERT_OK != SQLITE_DONE) {
-	fprintf(stderr, "%s\n", sqlite3_errmsg(db));
-	return 0;
+
+        fprintf(stderr, "[create_usr] %s\n", sqlite3_errmsg(db));
+        return 0;
     }
     sqlite3_reset(stmt);
     sqlite3_clear_bindings(stmt);
@@ -593,7 +651,6 @@ struct all_users {
     int len;
     struct usr_rec rec[4096];
 };
-
 
 int read_usr_all(sqlite3 *db,struct all_users *usr ) {
 
@@ -648,7 +705,7 @@ int update_usr(sqlite3 *db, struct usr_rec *usr) {
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
 
-#define DEV_MODE 1
+#define DEV_MODE 0
 void create_tables(sqlite3 *db) {
     for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
 	if(db_schema[i].creat){
@@ -671,6 +728,9 @@ sqlite3 *init_db() {
     SQLITE_SET_PRAGMA(foreign_keys,SQLITE_FOREIGN_KEYS);
     return db;
 }
+
+
+
 
 struct usr_rec new_usr_rec (int uid, char *email, char *phone, char *first, char *last) {
 
@@ -712,14 +772,16 @@ void pw_encrypt_and_add_to_db(sqlite3 *db, int uid, char *clr_pw) {
     create_pw(db, &pw);
 }
 
-/* if uid is in usr it must be in pw... */
+/* Retrieve pw_hash from the database searching by uid.
+ * Verify hashed clr_pw matches what is in the db. Return 1
+ * on success and 0 on failure */
 int pw_check_from_db(sqlite3 *db, int uid, char *clr_pw) {
     struct pw_rec pw;
     pw.uid = uid;
     int res = read_pw(db, &pw);
     (void) res;
     int verified = crypto_pwhash_str_verify(pw.hash, clr_pw, strlen(clr_pw));
-    return verified;
+    return (verified >= 0);
 }
 
 
@@ -740,6 +802,116 @@ void view_users_test(sqlite3 *db) {
 /* ============================     END DB          ============================================= */
 
 /* -----------------------------  Business Rules    --------------------------------------------- */
+
+enum INPUT_ERRORS {
+    BAD_EMAIL = 1,
+    BAD_FIRST = 2,
+    BAD_LAST = 4,
+    BAD_PHONE = 8
+};
+
+
+/* SANITIZE,NORMALIZE, VALIDATE*/
+/* NAME_T, EMAIL_T, PHONE_T */
+struct usr_rec snv_usr(struct usr_rec *usr, int *error_codes) {
+    int ret_code = 0;
+    struct usr_rec usr_cln = {0};
+
+    int f = 0;
+    int l = 0;
+    int p = 1;
+    int e = 0;
+
+    usr_cln.phone[0] = '+';
+
+    for (int i = 0; i < NAME_T - 1; i++) {
+        if (isalpha((unsigned char)usr->first[i])) {
+            usr_cln.first[f++] = tolower((unsigned char)usr->first[i]);
+        }
+        if (isalpha((unsigned char)usr->last[i])) {
+            usr_cln.last[l++] = tolower((unsigned char)usr->last[i]);
+        }
+    }
+
+    for (int i = 0; i < PHONE_T -1; i++) {
+        if(isdigit((unsigned char)usr->phone[i])) {
+            usr_cln.phone[p++]  = usr->phone[i];
+        } 
+    }
+    
+    if(!strlen(usr_cln.first)) ret_code |= BAD_FIRST;
+    if(!strlen(usr_cln.last)) ret_code |= BAD_LAST;
+    if ((strlen(usr_cln.phone) < 12) ||
+        (strlen(usr_cln.phone) > 16)) {
+        ret_code |= BAD_PHONE;
+    }
+    int j;
+    struct tmp_str {
+        unsigned char str[128];
+        int len;
+    };
+
+    struct tmp_str local = {0};
+    struct tmp_str domain = {0};
+
+    for (j = 0; usr->email[j] != '@' && j < EMAIL_T - 1; j++) {
+        char c = usr->email[j];
+        if(isalnum((unsigned char) c) || (c == '.') || (c == '_') ||
+           (c == '-') ||
+           (c == '+')) {
+            local.str[local.len++] = c;
+            usr_cln.email[e++] = tolower((unsigned char)c);
+        }
+    }
+    int dot_cnt = 0;
+    if (usr->email[j] == '@') {
+        usr_cln.email[e++] = '@';
+        j++;
+        for(; j < EMAIL_T - 1; j++) {
+            char c = usr->email[j];
+            if (isalnum((unsigned char)c) || (c == '.') || (c == '-')) {
+                domain.str[domain.len++] = c;
+                usr_cln.email[e++] = tolower((unsigned char)c);
+                if (c == '.') {
+                    dot_cnt++;
+                }
+            }
+        }
+    } else {
+        ret_code |= BAD_EMAIL;
+        goto END;
+    }
+    
+    if ((domain.len == 0) ||
+        (local.len == 0) ||
+        (local.str[0] == '.') ||
+        (local.str[local.len - 1] == '.') ||
+        (domain.str[0] == '.') ||
+        (domain.str[domain.len - 1] == '.') ||
+        (dot_cnt < 1)) {
+        ret_code |= BAD_EMAIL;
+        goto END;
+    }
+
+    /* Check for consecutive '.' in the email domain portion */
+    for (int i = 0; i < domain.len - 1; i++) {
+        if(domain.str[i] == '.' && domain.str[i + 1] == '.'){
+            ret_code |= BAD_EMAIL;
+            goto END;
+        }
+    }
+
+    /* Check for consecutive '.' in the email local portion */
+    for (int i = 0; i < local.len - 1; i++) {
+        if(local.str[i] == '.' && local.str[i + 1] == '.') {
+            ret_code |= BAD_EMAIL;
+            goto END;
+        }
+    }
+ END:
+    *error_codes = ret_code;
+    return usr_cln;
+}
 
 
 /* client req header item */
@@ -873,10 +1045,10 @@ void clear_screen(void) {
 }
 
 
-void read_password(char *buf, size_t size)
+
+void stdin_read_password(char *buf, size_t size)
 {
     struct termios old, new;
-
     tcgetattr(STDIN_FILENO, &old);
     new = old;
 
@@ -890,48 +1062,101 @@ void read_password(char *buf, size_t size)
     printf("\n");
 }
 
-int main(void) {
-    
-    sqlite3 *db = init_db();
-    create_tables(db);
 
-    struct pw_rec pw = {.uid = 0};
+void make_usr_root(sqlite3 *db) {
+    struct usr_rec usr =
+        new_usr_rec(0, "root", NULL, NULL, NULL);
+    create_usr(db, &usr);
+}
+
+void require_root(sqlite3 *db) {
+
+    int tries = 0;
+    struct pw_rec pw = {.uid = 0, .hash = ""};
     int found = read_pw(db, &pw);
+    clear_screen();
     if (!found) {
 
-        clear_screen();
-        printf("Welcome to MACABEE,\n"
-               "This is your first run\n"
-               "Create a root user password\n"
-               "\nPassword:");
         char pass1[32];
         char pass2[32];
-        read_password(pass1, 32);
+        printf("Welcome to MACABEE,"
+               "initial boot.\n"
+               "Create root password.\n");
+    TRYAGAIN_NEW:
+        printf("\nPassword:");
+        stdin_read_password(pass1, 32);
         printf("Confirm password:");
-        read_password(pass2, 32);
+        stdin_read_password(pass2, 32);
         if (strcmp(pass1,pass2) != 0) {
-            printf("entries do not match\n");
-            goto PWORD;
+            printf("try again\n");
+            goto TRYAGAIN_NEW;
         } else {
+            pass1[strcspn(pass1, "\n")] = '\0';
             pw_encrypt_and_add_to_db(db, 0, pass1);
         }
     } else {
-        
-        printf("please enter root password to start application\n");
+        name_t uname;
+        name_t pw_entered;
+
+        printf("(MACABEE BOOT: credentials required)\n\n");
+
+    TRYAGAIN_BOOT:
+        printf("Username: ");
+        fgets(uname, NAME_T, stdin);
+        uname[strcspn(uname, "\n")] = '\0';
+        printf("Password: ");
+        stdin_read_password(pw_entered, NAME_T);
+        pw_entered[strcspn(pw_entered, "\n")] = '\0';
+        if (pw_check_from_db(db, 0, pw_entered)) {
+            char buf[16];
+            //            clear_screen();
+            printf("Macabee Root Console Menu\n");
+            printf("1) Add Admin User  \n2) Continue to boot\n");
+            fgets(buf,sizeof buf,stdin);
+            u8 choice = (u8)strtoul(buf,NULL,10);
+            struct usr_rec usr;
+            if(choice == 1) {
+                printf("Email: ");
+                fgets(usr.email, EMAIL_T, stdin);
+                printf("Phone: ");
+                fgets(usr.phone, PHONE_T, stdin);
+                printf("First: ");
+                fgets(usr.first, NAME_T, stdin);
+                printf("Last: ");
+                fgets(usr.last, NAME_T, stdin);
+                usr.uid = next_uid(db, ADMIN_UID_T);
+                printf("next admin id = %d\n",usr.uid);
+                fgets(usr.first, NAME_T, stdin);
+            } 
+            return;
+        } else {
+            tries++;
+            printf("Failed attempt %d\n", tries);
+            if(tries == 3) {
+                fprintf(stderr, "%s\n", "[Process Exit] failure limit exceeded.");
+                exit(1);
+            }
+            goto TRYAGAIN_BOOT;
+        }
     }
-        
-    //add_usr_to_db(db);
+}
 
-    //view_users_test(db);
+int main(void) {
 
-    /* struct mg_mgr mgr; */
-    /* mg_mgr_init(&mgr); */
-    /* mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL); */
+    sqlite3 *db = init_db();
+    create_tables(db);
+    make_usr_root(db);
+    require_root(db);
+    //    clear_screen();
+    
+    struct mg_mgr mgr;
+    mg_mgr_init(&mgr);
+    mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
 
-    /* for(;;) { */
-    /* 	mg_mgr_poll(&mgr,1000); */
-    /*  } */
-    /* return 0; */
+    for(;;) {
+    	mg_mgr_poll(&mgr,1000);
+    }
+    return 0;
     sqlite3_close(db);
 }
 
