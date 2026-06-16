@@ -832,7 +832,7 @@ int snv_email(char *email, char *cln) {
            (c == '+')) {
             local.str[local.len++] = c;
             cln[e++] = tolower((unsigned char)c);
-        }
+        }   
     }
     int dot_cnt = 0;
     if (email[j] == '@') {
@@ -905,106 +905,6 @@ int snv_name(char *name, char *cln) {
     }
     if(!strlen(cln)) return 0;
     return 1;
-}
-
-struct usr_rec snv_usr(struct usr_rec *usr, int *error_codes) {
-    int ret_code = 0;
-    struct usr_rec usr_cln = {0};
-
-    int f = 0;
-    int l = 0;
-    int p = 1;
-    int e = 0;
-
-    usr_cln.phone[0] = '+';
-
-    for (int i = 0; i < NAME_T - 1; i++) {
-        if (isalpha((unsigned char)usr->first[i])) {
-            usr_cln.first[f++] = tolower((unsigned char)usr->first[i]);
-        }
-        if (isalpha((unsigned char)usr->last[i])) {
-            usr_cln.last[l++] = tolower((unsigned char)usr->last[i]);
-        }
-    }
-
-    for (int i = 0; i < PHONE_T -1; i++) {
-        if(isdigit((unsigned char)usr->phone[i])) {
-            usr_cln.phone[p++]  = usr->phone[i];
-        } 
-    }
-    
-    if(!strlen(usr_cln.first)) ret_code |= BAD_FIRST;
-    if(!strlen(usr_cln.last)) ret_code |= BAD_LAST;
-    if ((strlen(usr_cln.phone) < 12) ||
-        (strlen(usr_cln.phone) > 16)) {
-        ret_code |= BAD_PHONE;
-    }
-    int j;
-    struct tmp_str {
-        unsigned char str[128];
-        int len;
-    };
-
-    struct tmp_str local = {0};
-    struct tmp_str domain = {0};
-
-    for (j = 0; usr->email[j] != '@' && j < EMAIL_T - 1; j++) {
-        char c = usr->email[j];
-        if(isalnum((unsigned char) c) || (c == '.') || (c == '_') ||
-           (c == '-') ||
-           (c == '+')) {
-            local.str[local.len++] = c;
-            usr_cln.email[e++] = tolower((unsigned char)c);
-        }
-    }
-    int dot_cnt = 0;
-    if (usr->email[j] == '@') {
-        usr_cln.email[e++] = '@';
-        j++;
-        for(; j < EMAIL_T - 1; j++) {
-            char c = usr->email[j];
-            if (isalnum((unsigned char)c) || (c == '.') || (c == '-')) {
-                domain.str[domain.len++] = c;
-                usr_cln.email[e++] = tolower((unsigned char)c);
-                if (c == '.') {
-                    dot_cnt++;
-                }
-            }
-        }
-    } else {
-        ret_code |= BAD_EMAIL;
-        goto END;
-    }
-    
-    if ((domain.len == 0) ||
-        (local.len == 0) ||
-        (local.str[0] == '.') ||
-        (local.str[local.len - 1] == '.') ||
-        (domain.str[0] == '.') ||
-        (domain.str[domain.len - 1] == '.') ||
-        (dot_cnt < 1)) {
-        ret_code |= BAD_EMAIL;
-        goto END;
-    }
-
-    /* Check for consecutive '.' in the email domain portion */
-    for (int i = 0; i < domain.len - 1; i++) {
-        if(domain.str[i] == '.' && domain.str[i + 1] == '.'){
-            ret_code |= BAD_EMAIL;
-            goto END;
-        }
-    }
-
-    /* Check for consecutive '.' in the email local portion */
-    for (int i = 0; i < local.len - 1; i++) {
-        if(local.str[i] == '.' && local.str[i + 1] == '.') {
-            ret_code |= BAD_EMAIL;
-            goto END;
-        }
-    }
- END:
-    *error_codes = ret_code;
-    return usr_cln;
 }
 
 
@@ -1149,6 +1049,7 @@ void stdin_read_password(char *buf, size_t size)
     tcsetattr(STDIN_FILENO, TCSANOW, &new);
 
     fgets(buf, size, stdin);
+    buf[strcspn(buf, "\n")] = '\0';
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old);  /* restore */
 
@@ -1184,6 +1085,114 @@ int read_stdin_interactive(char *buf,char *prompt ,int len) {
     return 1;
 }
 
+void console_add_admin(sqlite3 *db) {
+    clear_screen();
+    char *prompt;
+
+    struct usr_rec usr = {0};            
+    char email[EMAIL_T] = {0};
+    char phone[PHONE_T] = {0};
+    char first[NAME_T]  = {0};
+    char  last[NAME_T]  = {0};
+
+    usr.uid = next_uid(db, ADMIN_UID_T);                
+
+ EMAIL:
+    prompt = "Email: ";
+
+    if(!read_stdin_interactive(email, prompt, EMAIL_T)) {
+        goto EMAIL;
+    }
+                
+    if (!snv_email(email, usr.email)) {
+        printf("Malformed email: try again\n");
+        goto EMAIL;
+    } 
+                
+ PHONE:
+                
+    prompt = "Phone (Country Code prefix required, 1 for USA): ";
+
+    if(!read_stdin_interactive(phone,prompt, PHONE_T))
+        goto PHONE;
+                
+    if (!snv_phone(phone, usr.phone)) {
+        printf("Illegal phone format: try again\n");
+        goto PHONE;
+    }
+                
+ FIRST:
+    prompt = "First: ";
+    if (!read_stdin_interactive(first,prompt, NAME_T)) {
+        goto FIRST;
+    }
+                
+    if (!snv_name(first, usr.first)) {
+        printf("Error: First name required, try again\n");
+        goto FIRST;
+    }
+                
+ LAST:
+    prompt = "Last: ";
+                
+    if(!read_stdin_interactive(last,prompt, NAME_T)) {
+        goto LAST;
+    }
+                
+    if (!snv_name(last, usr.last)) {
+        printf("Error: last name required, try again\n");
+        goto LAST;
+    }
+                
+ PASSWORD:
+    
+    char pass[32], confirm[32];
+
+    printf("Password:");
+    stdin_read_password(pass, 32);
+
+    printf("Confirm password:");
+    stdin_read_password(confirm, 32);
+
+    if (strcmp(pass,confirm) != 0) {
+        printf("try again\n");
+        goto PASSWORD;
+    }
+    
+    clear_screen();
+    char add[8] = {0};
+
+    printf("%s %s %s %s uid:%d\n Add admin? (y/n): ",usr.first, usr.last,usr.phone,usr.email,usr.uid);
+    read_stdin_interactive(add,"\n: ", sizeof(add));
+
+    if(add[0] == 'y') {
+        pw_encrypt_and_add_to_db(db, usr.uid, pass);
+        create_usr(db, &usr);
+    }
+}
+
+void root_menu(sqlite3 *db) {
+    char *prompt;
+    clear_screen();
+    prompt =
+        "Macabee Root Console Menu\n\n"
+        "1) Add Admin User\n"
+        "2) Continue to boot\n"
+        "\n> ";
+
+    char response[16];
+    read_stdin_interactive(response,
+                           prompt,
+                           sizeof(response));
+            
+    u8 choice = (u8)strtoul(response,NULL,10);
+            
+    if(choice == 1) {
+        console_add_admin(db);
+    }
+}
+
+/* Root password required for startup */
 void require_root(sqlite3 *db) {
 
     clear_screen();
@@ -1191,142 +1200,54 @@ void require_root(sqlite3 *db) {
     struct pw_rec pw = {.uid = 0, .hash = ""};
     int found = read_pw(db, &pw);
     
-    if (!found) {
-        
+    if (!found) {               /* root password NOT found get new root password.*/
+
         char pass1[32];
         char pass2[32];
         printf("Welcome to MACABEE,"
                "initial boot.\n"
                "Create root password.\n");
 
-    TRYAGAIN_NEW:
+    MATCH_PASSWORD:
+        
         printf("\nPassword:");
         stdin_read_password(pass1, 32);
+
         printf("Confirm password:");
         stdin_read_password(pass2, 32);
+        
         if (strcmp(pass1,pass2) != 0) {
             printf("try again\n");
-            goto TRYAGAIN_NEW;
-        } else {
-            pass1[strcspn(pass1, "\n")] = '\0';
-            pw_encrypt_and_add_to_db(db, 0, pass1);
+            goto MATCH_PASSWORD;
         }
-    } else {
+        
+        pw_encrypt_and_add_to_db(db, 0, pass1);
+        
+    } else {                    /* root password found */
         name_t pw_entered;
         int tries = 0;
-
         printf("(MACABEE BOOT: credentials required)\n\n");
-    TRYAGAIN_BOOT:
 
+    BOOT:
         printf("Password: ");
         stdin_read_password(pw_entered, NAME_T);
-        pw_entered[strcspn(pw_entered, "\n")] = '\0';
-
+        
         if (!pw_check_from_db(db, 0, pw_entered)) {
-            char *prompt;
-            clear_screen();
-            prompt =
-                "Macabee Root Console Menu\n\n"
-                "1) Add Admin User\n"
-                "2) Continue to boot\n"
-                "\n> ";
-
-            char buf[16];
-            read_stdin_interactive(buf,prompt,sizeof(buf));
-            u8 choice = (u8)strtoul(buf,NULL,10);
-
-            if(choice == 1) {
-                clear_screen();
-
-                struct usr_rec usr = {0};            
-                char email[EMAIL_T] = {0};
-                char phone[PHONE_T] = {0};
-                char first[NAME_T]  = {0};
-                char  last[NAME_T]  = {0};
-
-                usr.uid = next_uid(db, ADMIN_UID_T);                
-
-            EMAIL:
-                prompt = "Email: ";
-
-                if(!read_stdin_interactive(email, prompt, EMAIL_T)) {
-                    goto EMAIL;
-                }
-                
-                if (!snv_email(email, usr.email)) {
-                    printf("Malformed email: try again\n");
-                    goto EMAIL;
-                } 
-                
-            PHONE:
-                
-                prompt = "Phone (Country Code prefix required, 1 for USA): ";
-
-                if(!read_stdin_interactive(phone,prompt, PHONE_T))
-                    goto PHONE;
-                
-                if (!snv_phone(phone, usr.phone)) {
-                    printf("Illegal phone format: try again\n");
-                    goto PHONE;
-                }
-                
-            FIRST:
-                prompt = "First: ";
-                if (!read_stdin_interactive(first,prompt, NAME_T)) {
-                    goto FIRST;
-                }
-                
-                if (!snv_name(first, usr.first)) {
-                    printf("Error: First name required, try again\n");
-                    goto FIRST;
-                }
-                
-            LAST:
-                prompt = "Last: ";
-                
-                if(!read_stdin_interactive(last,prompt, NAME_T)) {
-                    goto LAST;
-                }
-                
-                if (!snv_name(last, usr.last)) {
-                    printf("Error: last name required, try again\n");
-                    goto LAST;
-                }
-                
-            PASSWORD:
-                char admin_pass1[32], admin_pass2[32];
-                printf("Password:");
-                stdin_read_password(admin_pass1, 32);
-                printf("Confirm password:");
-                stdin_read_password(admin_pass2, 32);
-                if (strcmp(admin_pass1,admin_pass2) != 0) {
-                    printf("try again\n");
-                    goto PASSWORD;
-                } else {
-                    admin_pass1[strcspn(admin_pass1, "\n")] = '\0';
-                }
-                clear_screen();
-                char add[8] = {0};
-                printf("%s %s %s %s uid:%d\n Add admin? (y/n): ",usr.first, usr.last,usr.phone,usr.email,usr.uid);
-                fgets(add,sizeof(add),stdin);
-                
-                // add user and pw to db
-                // pw_encrypt_and_add_to_db(db, usr.uid, pass1);
-            }
-            clear_screen();
-            printf("Macabee engaged, server started: \n\n");
-            return;
-        } else {
             tries++;
             printf("Failed attempt %d\n", tries);
             if(tries == 3) {
                 fprintf(stderr, "%s\n", "[Process Exit] failure limit exceeded.");
                 exit(1);
             }
-            goto TRYAGAIN_BOOT;
+            goto BOOT;
         }
     }
+    root_menu(db);
+    clear_screen();
+    printf("Macabee engaged, server started: \n\n");
+    return;
 }
+
 
 int main(void) {
 
@@ -1334,9 +1255,8 @@ int main(void) {
     create_tables(db);
     make_usr_root(db);
     require_root(db);
-
     
-    
+        
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
