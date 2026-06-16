@@ -330,7 +330,7 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 
 
 #define NAME_T 25
-#define EMAIL_T 25
+#define EMAIL_T 128
 #define PHONE_T 17 //phone
 #define PW_HASH_T crypto_pwhash_STRBYTES
 
@@ -360,9 +360,10 @@ typedef char pw_t[PW_HASH_T];
 
 #define USR_SCHEMA                              \
     TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
+    TCV(USR_C,  uname, email_t, TEXT, UQ)       \
     TCV(USR_C,  email, email_t, TEXT, NN UQ)    \
-    TCV(USR_C,  phone, phone_t, TEXT, NN UQ)		\
-    TCV(USR_C, first, name_t, TEXT)             \
+    TCV(USR_C,  phone, phone_t, TEXT, NN UQ)    \
+    TCV(USR_C,  first, name_t, TEXT)            \
     TCVL(USR_C, last, name_t, TEXT)			
 
 
@@ -1052,10 +1053,8 @@ void stdin_read_password(char *buf, size_t size)
     buf[strcspn(buf, "\n")] = '\0';
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old);  /* restore */
-
     printf("\n");
 }
-
 
 void make_usr_root(sqlite3 *db) {
     struct usr_rec usr =
@@ -1086,6 +1085,7 @@ int read_stdin_interactive(char *buf,char *prompt ,int len) {
 }
 
 void console_add_admin(sqlite3 *db) {
+    
     clear_screen();
     char *prompt;
 
@@ -1096,6 +1096,7 @@ void console_add_admin(sqlite3 *db) {
     char  last[NAME_T]  = {0};
 
     usr.uid = next_uid(db, ADMIN_UID_T);                
+
 
  EMAIL:
     prompt = "Email: ";
@@ -1110,7 +1111,6 @@ void console_add_admin(sqlite3 *db) {
     } 
                 
  PHONE:
-                
     prompt = "Phone (Country Code prefix required, 1 for USA): ";
 
     if(!read_stdin_interactive(phone,prompt, PHONE_T))
@@ -1143,9 +1143,8 @@ void console_add_admin(sqlite3 *db) {
         printf("Error: last name required, try again\n");
         goto LAST;
     }
-                
+
  PASSWORD:
-    
     char pass[32], confirm[32];
 
     printf("Password:");
