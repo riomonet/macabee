@@ -16,7 +16,19 @@
 #include "uthash.h"
 
 
-#define UID_NF UINT16_MAX
+#define UID_NF UINT16_MAX // UID NOT FOUND SENTINEL.
+
+sqlite3 *db;
+
+/* Role values must be explictly defined or db values will no align. */
+enum ROLES {
+    ROLE_NONE = 0,
+    ROLE_ALPHA = 1,
+    ROLE_OFFICE = 2,
+    ROLE_YARD = 3,
+    ROLE_ACCOUNTING = 4
+};
+
 /* ============================================================================
        BIG FUCKING BUSINESS HERE
 =============================================================================== */
@@ -101,7 +113,6 @@ enum LOGIN_SCR_IDX {
         LOGIN_SCREEN_FIELDS
     }; 
 #undef X
-
 
 /* --------------------------------------------END LOGIN SCREENS ---------------------------------------------- */
 /* -------------------------------------------- MAIN SCREEN START --------------------------------------------- */
@@ -360,9 +371,10 @@ typedef char pw_t[PW_HASH_T];
 
 #define USR_SCHEMA                              \
     TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
-    TCV(USR_C,  uname, email_t, TEXT, UQ)       \
-    TCV(USR_C,  email, email_t, TEXT, NN UQ)    \
-    TCV(USR_C,  phone, phone_t, TEXT, NN UQ)    \
+    TCV(USR_C,  uname, name_t, TEXT, NN UQ)     \
+    TCV(USR_C,  role,  u8, INTEGER, NN)         \
+    TCV(USR_C,  email, email_t, TEXT)           \
+    TCV(USR_C,  phone, phone_t, TEXT)           \
     TCV(USR_C,  first, name_t, TEXT)            \
     TCVL(USR_C, last, name_t, TEXT)			
 
@@ -507,8 +519,7 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
 
 /* PW crud */
 sqlite3_stmt *create_pw_stmt = NULL;
-sqlite3_stmt *read_pw_stmt = NULL;   //where uid = ?
-
+sqlite3_stmt *read_pw_stmt = NULL;   //by uid
 
 int create_pw (sqlite3 *db, struct pw_rec *pw) {
     if(!create_pw_stmt) {
@@ -534,6 +545,8 @@ int create_pw (sqlite3 *db, struct pw_rec *pw) {
     return 1;    
 }
 
+
+/* ID RANGES */
 sqlite3_stmt *next_uid_admin_stmt; /* Admin range is 10 < uid <= 100 */
 sqlite3_stmt *next_uid_staff_stmt; /* Staff range is 100 < uid  <= 200  */
 sqlite3_stmt *next_uid_customer_stmt;  /* customre range is 1000 < uid < U16 max */
@@ -625,21 +638,22 @@ int create_usr(sqlite3 *db, struct usr_rec *usr) {
     if(!insert_usr_stmt) {
         insert_usr_stmt = create_statement(db,
                                            "INSERT INTO usr"
-                                           "(uid, email, phone, first, last)"
-                                           "VALUES (?, ?, ?, ?, ?)"
+                                           "(uid, role, uname, email, phone, first, last)"
+                                           "VALUES (?, ?, ?, ?, ?, ?, ?)"
                                            );
     }
     
     sqlite3_stmt *stmt = insert_usr_stmt;
     sqlite3_bind_int(stmt,  1, usr->uid);
-    sqlite3_bind_text(stmt, 2, usr->email, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, usr->phone, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, usr->first, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, usr->last,  -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt,  2, usr->role);
+    sqlite3_bind_text(stmt, 3, usr->uname, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, usr->email, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 5, usr->phone, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 6, usr->first, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 7, usr->last,  -1, SQLITE_STATIC);
 
     int INSERT_OK = sqlite3_step(stmt);
     if (INSERT_OK != SQLITE_DONE) {
-
         fprintf(stderr, "[create_usr] %s\n", sqlite3_errmsg(db));
         return 0;
     }
@@ -653,6 +667,7 @@ struct all_users {
     struct usr_rec rec[4096];
 };
 
+
 int read_usr_all(sqlite3 *db,struct all_users *usr ) {
 
     if(!getall_usr_stmt) {
@@ -664,6 +679,8 @@ int read_usr_all(sqlite3 *db,struct all_users *usr ) {
     int i = 0;
     while(sqlite3_step(stmt) == SQLITE_ROW) {
 	usr->rec[i].uid = sqlite3_column_int(stmt,USR_C_uid);
+    usr->rec[i].role = sqlite3_column_int(stmt,USR_C_role);
+    strcpy(usr->rec[i].uname, (const char*)sqlite3_column_text(stmt, USR_C_uname));
 	strcpy(usr->rec[i].email, (const char*)sqlite3_column_text(stmt, USR_C_email));
 	strcpy(usr->rec[i].phone, (const char*)sqlite3_column_text(stmt, USR_C_phone));
 	strcpy(usr->rec[i].first, (const char*)sqlite3_column_text(stmt, USR_C_first));
@@ -730,36 +747,6 @@ sqlite3 *init_db() {
     return db;
 }
 
-
-
-
-struct usr_rec new_usr_rec (int uid, char *email, char *phone, char *first, char *last) {
-
-    if (!email) email = "";
-    if (!phone) phone = "";
-    if (!first) first = "";
-    if (!last)  last = "";
-
-    struct usr_rec rec = {
-	.uid = uid,
-    };
-
-    strcpy(rec.email,email);
-    strcpy(rec.phone,phone);
-    strcpy(rec.first,first);
-    strcpy(rec.last,last);
-
-    return rec;
-}
-
-
-void add_usr_to_db(sqlite3 *db, int uid, char *email, char *phone, char *first, char *last) {
-    
-    struct usr_rec rec = new_usr_rec(uid, email, phone, first, last);
-    create_usr(db,&rec);
-}
-
-
 void pw_encrypt_and_add_to_db(sqlite3 *db, int uid, char *clr_pw) {
     struct pw_rec pw;
     pw.uid = uid;
@@ -803,12 +790,6 @@ void view_users_test(sqlite3 *db) {
 
 /* -----------------------------  Business Rules    --------------------------------------------- */
 
-enum INPUT_ERRORS {
-    BAD_EMAIL = 1,
-    BAD_FIRST = 2,
-    BAD_LAST = 4,
-    BAD_PHONE = 8
-};
 
 /* SANITIZE,NORMALIZE, VALIDATE*/
 /* NAME_T, EMAIL_T, PHONE_T */
@@ -923,6 +904,8 @@ struct __attribute__((packed)) cfb {
     char val[24];
 };
 
+
+/* NEXT TODO */
 void try_login(struct player *player, u8 *reqbuf) {
 
     /* Prevent login for 3 seconds after 3 missed attempts */
@@ -936,9 +919,9 @@ void try_login(struct player *player, u8 *reqbuf) {
     struct cfh *header = (struct cfh*) reqbuf;
     
     if ( header->nFields < 2) {
-	player->auth.attempts++;
-	render_login_warning(player, "All fields required.");
-	return;
+        player->auth.attempts++;
+        render_login_warning(player, "All fields required.");
+        return;
     }
 
     /* Copy 'user' and 'pass' from reqbuffer to player. */
@@ -947,10 +930,28 @@ void try_login(struct player *player, u8 *reqbuf) {
     struct cfb *user = (struct cfb*) input_fld;  
     struct cfb *pass = (struct cfb*) (input_fld + sizeof(*user));
 
+    
+    /* struct all_users usrs; */
+    /*    int uid = UID_NF; */
+    /* read_usr_all(db,&usrs); */
+    /* for(int i = 0; i < usrs.len; i++) { */
+    /*     printf("%s %s %d \n", usrs.rec[i].uname, usrs.rec[i].email, user->len); */
+    /*     if( (memcmp(usrs.rec[i].uname, user->val, 5) == 0) || */
+    /*         (memcmp(usrs.rec[i].email, user->val, 5) == 0)) { */
+    /*         uid = usrs.rec[i].uid; */
+    /*         break; */
+    /*     } */
+    /* } */
+    /* if(uid != UID_NF) { */
+    /*     printf("found!"); */
+    /* } else  { */
+    /*     printf("not found"); */
+    /* } */
+
     (void) pass;
     /* Check the db for email_address is there.*/
-    struct usr_rec usr_rec;
-    (void) usr_rec;
+    
+    //    (void) usr_rec;
     //    int usr_found = gusr(USR_C_pw_hash, (void *)user->val, &usr_rec);
 
     /* if(usr_found) { */
@@ -966,6 +967,7 @@ void try_login(struct player *player, u8 *reqbuf) {
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
 
+        
     (void) reqbuflen;
     struct player *player = NULL;
     HASH_FIND_PTR(players,&c, player);
@@ -979,7 +981,7 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
         switch(player->scrid) {        /* Player is in the world. dispatch based on screen state.*/
         case SCR_LOGIN:         
             {
-		try_login(player,reqbuf);
+                try_login(player,reqbuf);
 		if (player->auth.uid != UID_NF) {
 		    render_screen_template(player, SCR_MAIN);
 		}
@@ -1033,7 +1035,6 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     }
 }
 
-
 void clear_screen(void) {
     printf("\033[2J\033[H");
     fflush(stdout);
@@ -1054,12 +1055,6 @@ void stdin_read_password(char *buf, size_t size)
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old);  /* restore */
     printf("\n");
-}
-
-void make_usr_root(sqlite3 *db) {
-    struct usr_rec usr =
-        new_usr_rec(0, "root", NULL, NULL, NULL);
-    create_usr(db, &usr);
 }
 
 void flush_stdin() {
@@ -1089,14 +1084,13 @@ void console_add_admin(sqlite3 *db) {
     clear_screen();
     char *prompt;
 
-    struct usr_rec usr = {0};            
+    struct usr_rec usr = {0};
     char email[EMAIL_T] = {0};
     char phone[PHONE_T] = {0};
     char first[NAME_T]  = {0};
     char  last[NAME_T]  = {0};
 
     usr.uid = next_uid(db, ADMIN_UID_T);                
-
 
  EMAIL:
     prompt = "Email: ";
@@ -1162,20 +1156,27 @@ void console_add_admin(sqlite3 *db) {
     char add[8] = {0};
 
     printf("%s %s %s %s uid:%d\n Add admin? (y/n): ",usr.first, usr.last,usr.phone,usr.email,usr.uid);
-    read_stdin_interactive(add,"\n: ", sizeof(add));
+    read_stdin_interactive(add,"", sizeof(add));
 
     if(add[0] == 'y') {
         pw_encrypt_and_add_to_db(db, usr.uid, pass);
+        strcpy(usr.uname, "alpha");
+        usr.role = ROLE_ALPHA;
         create_usr(db, &usr);
     }
 }
 
+/* uid 0, is root. It will never exist in the usr table
+ * uid 10, is master admin account. It will exist in the
+ * usr table and the pw table. Both accounts/pw are created
+ * during first boot from the cmd line. */
 void root_menu(sqlite3 *db) {
+    
     char *prompt;
     clear_screen();
     prompt =
         "Macabee Root Console Menu\n\n"
-        "1) Add Admin User\n"
+        "1) Add/Edit/Update Master Admin Account\n"
         "2) Continue to boot\n"
         "\n> ";
 
@@ -1193,9 +1194,8 @@ void root_menu(sqlite3 *db) {
 
 /* Root password required for startup */
 void require_root(sqlite3 *db) {
-
+    
     clear_screen();
-
     struct pw_rec pw = {.uid = 0, .hash = ""};
     int found = read_pw(db, &pw);
     
@@ -1241,6 +1241,7 @@ void require_root(sqlite3 *db) {
             goto BOOT;
         }
     }
+    /* Root menu is server maintanance menu */
     root_menu(db);
     clear_screen();
     printf("Macabee engaged, server started: \n\n");
@@ -1250,12 +1251,12 @@ void require_root(sqlite3 *db) {
 
 int main(void) {
 
-    sqlite3 *db = init_db();
+    db = init_db();
     create_tables(db);
-    make_usr_root(db);
+    #if 0
     require_root(db);
-    
-        
+    #endif
+            
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
