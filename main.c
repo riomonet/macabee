@@ -69,7 +69,6 @@ enum ROLES {
 #define STR2(X) #X
 #define STR(X) STR2(X)
 
-
 #define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos)   \
     {       .op_A = (opA),                                  \
             .op_B = (opB),                                  \
@@ -79,10 +78,18 @@ enum ROLES {
             .ic = (cursor_pos)                              \
     }
 
+
+#define ALL_SCREENS                             \
+    Y(LOGIN_SCREEN)                             \
+    Y(MAIN_SCREEN)                              \
+    Y(MAIN_SCREEN_ALPHA)                        \
+
+
+
 /* -------------------- LOGIN SCREEN --------------------- */
 
 /* col, row */
-#define LOGIN_SCREEN_FIELDS						\
+#define LOGIN_SCREEN						\
     LABEL(LOGIN_L1           , 9,   8, 27,     "USER . . . . . . . . . . . ") \
         LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ") \
         INPUT(LOGIN_IUSER    , 38,  8, 24)                              \
@@ -93,16 +100,15 @@ enum ROLES {
 	
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum LOGIN_SCR_IDX {
-    LOGIN_SCREEN_FIELDS
+    LOGIN_SCREEN
     LOGIN_FIELD_COUNT
 };
 #undef X
 
-
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     [id] = { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
     struct field_layout login_screen_layout[] = {
-        LOGIN_SCREEN_FIELDS 
+        LOGIN_SCREEN
     };
 #undef X
 
@@ -110,7 +116,7 @@ enum LOGIN_SCR_IDX {
    [id] = { .field_id = (id), .text = (txt), .text_len = (len),   \
             .fg_color = (col), .flags = (flg) },
     struct field_state login_screen_state[] = {
-        LOGIN_SCREEN_FIELDS
+        LOGIN_SCREEN
     }; 
 #undef X
 
@@ -225,11 +231,11 @@ struct screen {
 /* Global Screen templates:  */
 struct screen screens[] = {
     [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state,LOGIN_IUSER),
-    [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
+    [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT),
+    [SCR_MAIN_ALPHA] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
 };
 
 /* ---------------------------- World state management ------------------------------------ */
-
 
 /* def_player */
 struct player {
@@ -239,7 +245,7 @@ struct player {
     struct auth {
         time_t logintim;
         u8 attempts;
-        u8 permissions;
+        u8 role;
         u16 uid;
         char uname[25];
         time_t locked_until;
@@ -259,7 +265,7 @@ struct player *onboard_new_player(struct mg_connection *c) {
     player->scrid = SCR_LOGIN;
     player->auth.logintim = 0;
     player->auth.attempts = 0;
-    player->auth.permissions = 0;
+    player->auth.role = 0;
     memset(player->auth.uname, 0, sizeof(player->auth.uname)); 
     player->auth.uid = UID_NF;           
     player->auth.locked_until = 0;
@@ -280,14 +286,6 @@ void mb_send (struct player *player, struct screen *scr) {
                                                          );
 
     mg_ws_send(player->c, payload.buf, payload.len, WEBSOCKET_OP_BINARY);
-}
-
-void init_authenticated_player(struct player *player) {
-    player->scrid = SCR_MAIN;
-    player->auth.logintim = time(NULL);
-    //    player->auth.permissions = get_permissions(uid);
-    player->auth.attempts = 0;
-    player->auth.locked_until = 0;
 }
      
 
@@ -432,62 +430,7 @@ DB_TABLES
 
 DB_TABLES
 
-#undef TCV
-#undef TCVL
 #undef X
-
-#if 0
-/* ***** SCHEMA DERIVED CRUD STATEMENTS GLOBAL DECLARATIONS ***** */
-/* Get */
-#define TCV(tbl, name, ctype, type, ...) sqlite3_stmt *get_##tbl##_by_##name##_stmt;
-#define TCVL(tbl, name, ctype,type,  ...) sqlite3_stmt *get_##tbl##_by_##name##_stmt;
-#define CRUD_GET_STMT(name, tbl) tbl
-
-CRUD_GET_STMT(usr,USR_SCHEMA)
-CRUD_GET_STMT(sys_state,SYS_STATE_SCHEMA)
-
-#undef TCV
-#undef TCVL
-
-#define TCV(tbl, name, ctype, type, ...)  \
-get_##tbl##_by_##name##_stmt = create_statment(db,"select * from " #tbl " where " #name " = ?");
-
-#define TCVL(tbl, name, ctype,type,  ...) \
-get_##tbl##_by_##name##_stmt =  create_statment(db,"select * from " #tbl " where " #name " = ?");
-
-#define CRUD_INIT_FUNCTION_GET_STMT(name,tbl) \
-int init_get_stmts(sqlite3* db) {tbl}
-
-CRUD_INIT_FUNCTION_GET_STMT(usr,USR_SCHEMA)
-
-#undef TCV
-#undef TCVL
-
-
-#define BIND_text(stmt) sqlite3_bind_text(stmt, 1,(char *)val, -1 , SQLITE_STATIC);
-#define BIND_int(stmt)	sqlite3_bind_int(stmt, 1, *(int*)val);
-
-#define get_col_int(tbl,name, ctype, type, ...)  tbl->name = sqlite3_column_int(stmt, tbl##_##name));
-#define get_col_text(tbl,name, ctype, type, ...) strcpy(tbl->name,(const char*)sqlite3_column_text(stmt, tbl##_##name));
-
-#define TCV(tbl, name, ctype, type, ...)    get_col_##type(tbl,name, ctype, type, ...)
-#define TCVL(tbl, name, ctype, type, ...)   get_col_##type(tbl,name, ctype, type, ...)
-
-USR_SCHEMA
-
-#undef TCV
-#undef TCVL
-
-#define TCV(tbl, name, ctype, type, ...)		\
-    int get_##tbl_by_##name(void *val) {		\
-	BIND_##type(get_##tbl##_by_##name##_stmt)	\
-	    }
-
-#define TCVL(tbl, name, ctype,type,  ...)      
-USR_SCHEMA
-
-#endif
-
 #undef TCV
 #undef TCVL
 #undef x20
@@ -723,11 +666,12 @@ int update_usr(sqlite3 *db, struct usr_rec *usr) {
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
 
-#define DEV_MODE 0
+#define DEV_MODE 1
+#define DB_RESET 0
 void create_tables(sqlite3 *db) {
     for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
 	if(db_schema[i].creat){
-	    if(DEV_MODE) {
+	    if(DB_RESET) {
 		sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL);
 		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
 	    } else {
@@ -889,7 +833,6 @@ int snv_name(char *name, char *cln) {
     return 1;
 }
 
-
 /* client req header item */
 struct __attribute__((packed)) cfh {
     u8 opcode;
@@ -901,111 +844,125 @@ struct __attribute__((packed)) cfh {
 struct __attribute__((packed)) cfb {
     u8 id; //field_id
     u8 len;
-    char val[24];
+    char val[24]; 
 };
 
+struct login_attempt {
+    struct cfh head;
+    struct cfb username;
+    struct cfb password;
+};
 
-/* NEXT TODO */
+void print_login_attempt(struct login_attempt *login) {
+    printf("**********************************************************\n"); 
+    printf("feild-id: %d\t",login->username.id);
+    printf("field_len: %d\t", login->username.len);
+    printf("text: %.*s\n",24,login->username.val);
+    printf("feild-id: %d\t",login->password.id);
+    printf("field_len: %d\t", login->password.len);
+    printf("text: %.*s\n",24,login->password.val);
+    printf("**********************************************************\n");
+}
+
+struct usr_rec new_usr_rec() {
+    struct usr_rec usr = {
+        .uid = UID_NF,
+        .role = ROLE_NONE
+    };
+    return usr;
+}
+
 void try_login(struct player *player, u8 *reqbuf) {
 
-    /* Prevent login for 3 seconds after 3 missed attempts */
-    
+    /* Prevents login. 3 seconds after 3 missed attempts */
     if (time(NULL) < player->auth.locked_until) {
 	render_login_warning(player, "Login lockout for 3 seconds.");
 	return;
     }
+        
+    struct login_attempt *attempt = (struct login_attempt*) reqbuf;
+    struct all_users users = {0};
+    struct usr_rec usr = new_usr_rec();
+    struct usr_rec cur = new_usr_rec();
+
+    char username[NAME_T] = {0};
+    char password[NAME_T] = {0};
+
+    memcpy(username, attempt->username.val, attempt->username.len);
+    memcpy(password, attempt->password.val, attempt->password.len);
+
+    snv_name(username, usr.uname);
+    read_usr_all(db, &users);
+
+    /* fill in the inforamtion */
+    for (int i = 0; i < users.len; i++ ) {
+        cur = users.rec[i];
+        if(strcmp(usr.uname, cur.uname ) == 0) {
+            usr = cur;
+            break;
+        }
+    }
+    
+    if (pw_check_from_db(db, usr.uid, password)) {
+        switch(usr.role) {
+        case ROLE_ALPHA:  { player->scrid = SCR_MAIN;  } break;
+        case ROLE_OFFICE: { player->scrid = SCR_MAIN; } break;
+        }
+        
+        player->auth.logintim = time(NULL);
+        player->auth.attempts = 0;
+        player->auth.role = usr.role;
+        player->auth.uid = usr.uid;
+        strcpy(player->auth.uname, usr.uname);
+        player->auth.locked_until = 0;
+    } else {
+        player->auth.attempts++;
+        printf("failed\n");
+    }
+
     /* Verify both input fields were submitted.. */
-    
-    struct cfh *header = (struct cfh*) reqbuf;
-    
-    if ( header->nFields < 2) {
+    if (attempt->head.nFields < 2) {
         player->auth.attempts++;
         render_login_warning(player, "All fields required.");
         return;
     }
-
-    /* Copy 'user' and 'pass' from reqbuffer to player. */
-    u8 *input_fld = reqbuf += sizeof(header);
-	    
-    struct cfb *user = (struct cfb*) input_fld;  
-    struct cfb *pass = (struct cfb*) (input_fld + sizeof(*user));
-
-    
-    /* struct all_users usrs; */
-    /*    int uid = UID_NF; */
-    /* read_usr_all(db,&usrs); */
-    /* for(int i = 0; i < usrs.len; i++) { */
-    /*     printf("%s %s %d \n", usrs.rec[i].uname, usrs.rec[i].email, user->len); */
-    /*     if( (memcmp(usrs.rec[i].uname, user->val, 5) == 0) || */
-    /*         (memcmp(usrs.rec[i].email, user->val, 5) == 0)) { */
-    /*         uid = usrs.rec[i].uid; */
-    /*         break; */
-    /*     } */
-    /* } */
-    /* if(uid != UID_NF) { */
-    /*     printf("found!"); */
-    /* } else  { */
-    /*     printf("not found"); */
-    /* } */
-
-    (void) pass;
-    /* Check the db for email_address is there.*/
-    
-    //    (void) usr_rec;
-    //    int usr_found = gusr(USR_C_pw_hash, (void *)user->val, &usr_rec);
-
-    /* if(usr_found) { */
-    /* 	int verified = */
-    /* 	(void)verified; */
-    /* } */
-    /* else { */
-	
-    /* } */
 }
-
 
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
 
-        
     (void) reqbuflen;
+        
+    
     struct player *player = NULL;
     HASH_FIND_PTR(players,&c, player);
 
     if (!player) {              
         /* Player is not yet added to the world. 
-         * add player to the world and send initial screen. */
+         * add player to the world and send initial login screen. */
         player = onboard_new_player(c);
         render_screen_template(player, SCR_LOGIN);
     } else {
-        switch(player->scrid) {        /* Player is in the world. dispatch based on screen state.*/
+        /* Player is in the world. Handler functions
+         * aways set next scrid. */
+        render_screen_template(player, player->scrid);
+        switch(player->scrid) { 
         case SCR_LOGIN:         
             {
                 try_login(player,reqbuf);
-		if (player->auth.uid != UID_NF) {
-		    render_screen_template(player, SCR_MAIN);
-		}
-		/* init_authenticated_player(player); */
-                /* if (extract_login_creds(player, reqbuf)) { */
-		/*     int uid = try_login(player,); */
-		/*     if (player->auth.uid != UID_NF) { */
-		/* 	printf("uid Success: %d",uid); */
-
-		/* 	render_screen_template(player, SCR_MAIN); */
-		/*     } */
-                /* } else { */
-		/*     render_login_warning(player, "Please enter user and pass"); */
-		    
-		/* }  */
             } break;
-            
         case SCR_MAIN:
             {
-                /* Get aid key and deploy screen */
-                printf("IN SCRMAIN\n");
-                render_screen_template(player, SCR_MAIN);
+                switch(player->auth.role) {
+                case ROLE_ALPHA:
+
+                    break;
+                case ROLE_OFFICE:     
+                    break;
+                }
             } break;
         }
+
     }
 }
 
@@ -1248,12 +1205,11 @@ void require_root(sqlite3 *db) {
     return;
 }
 
-
 int main(void) {
 
     db = init_db();
     create_tables(db);
-    #if 0
+    #ifndef DEV_MODE
     require_root(db);
     #endif
             
@@ -1295,6 +1251,7 @@ int main(void) {
 
   ------------------------------------------------------------------------------------------------------------------------------ */
 /*
+  
   struct __attribute__((packed))
   Opcode 1
   type of data, labales and inputs, images, multimedia

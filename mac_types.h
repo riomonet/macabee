@@ -61,7 +61,7 @@ struct __attribute__((packed)) field_state {
 };
 
 enum where_you_at {
-    SCR_LOGIN, SCR_MAIN
+    SCR_LOGIN, SCR_MAIN, SCR_MAIN_ALPHA
 };
 
 enum permissions {
