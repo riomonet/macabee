@@ -88,21 +88,21 @@ enum ROLES {
 
 /* SCREEN STUBS */
 #define SCREEN_STUB_HEADER(SCR,title)					\
-    LABEL(SCR##_FLD_USER,7,1,8, "")					\
-    LABEL(SCR##_FLD_DATE,67,1,8, "")					\
-    LABEL(SCR##_FLD_TIME,67,2,8, "")					\
+    LABEL(SCR##_FLD_USER,7,1,32, "")					\
+    LABEL(SCR##_FLD_DATE,67,1,32, "")					\
+    LABEL(SCR##_FLD_TIME,67,2,12, "")					\
     LABEL(SCR##_FLD_TITLE,29,1,21, title)				\
     LABEL_CF(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
 #define SCREEN_STUB_FOOTER(SCR)				\
-    LABEL(SCR##FOOTER_SELECTION,1,23,9,"Selection")	\
-    LABEL(SCR##FOOTER_ARROW,1,24,4, "-->")		\
-    HL(SCR##_FOOTER_HL1,1,26,100)			\
-    LABEL(MAIN_L14,6,28,9,"F6=Logout")			\
-    LABEL(MAIN_L15,19,28,9, "F7=Search")		\
-    LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")		\
-    HL(SCR##_FOOTER_HL2,0,29,100)			\
-    HL(SCR##_FOOTER_HL3,7,24,90)			\
+    LABEL(SCR##FLD_SELECTION,1,23,9,"Selection")	\
+    LABEL(SCR##FLD_ARROW,1,24,4, "-->")		\
+    HL(SCR##_FLD_HL1,1,26,100)			\
+    LABEL(SCR##_FLD_F1,6,28,9,"")			\
+    LABEL(SCR##_FLD_F2,19,28,9, "")			\
+    LABEL(SCR##_FLD_F3,31,28,16,"")			\
+    HL(SCR##_FLD_HL2,0,29,100)			\
+    HL(SCR##_FLD_HL3,7,24,90)			\
     INPUT(SCR##_ISELECT,6,24,1)                              
 
 /* LOGIN SCREEN col, row */
@@ -894,20 +894,37 @@ void set_live_screen(struct player *player, enum SCRID scrid) {
     memcpy(scr->state, tmpl.state, tmpl.nFields * sizeof(struct field_state));
 }
 
+void today(char *buf, int len) {
+    
+    time_t now = time(NULL);
+    struct tm *tm = localtime(&now);
+    
+    strftime(buf, len, "%a %b %d, %Y", tm);
+
+}
+
+
+
+void set_screen_text(struct player *player, int col, char *txt) {
+    player->scr.state[col].text_len = strlen(txt);
+    strcpy(player->scr.state[col].text, txt);
+}
+
+
+#define TITLE_BAR(SCR)					\
+    char user[32];					\
+    snprintf(user, 32, "user: %s", player->auth.uname);	\
+    set_screen_text(player,SCR##_FLD_USER, user);	\
+    char date[32];					\
+    today(date, sizeof(date));				\
+    set_screen_text(player,SCR##_FLD_DATE, date);
+
+
+
 void goto_main_screen(struct player *player) {
-
     set_live_screen(player, IN_MAIN_SCREEN);
-    
-    player->scr.state[MAIN_SCREEN_FLD_USER].text_len = strlen(player->auth.uname);
-    strcpy(player->scr.state[MAIN_SCREEN_FLD_USER].text, player->auth.uname);
-
-    player->scr.state[MAIN_SCREEN_FLD_DATE].text_len = strlen("10/1/20");
-    strcpy(player->scr.state[MAIN_SCREEN_FLD_DATE].text, "10/1/20");
-
-    //set user name
-    //set date
-    //set time with seconds.....
-    
+    TITLE_BAR(MAIN_SCREEN)
+	
     mb_send(player);    
 }
 
