@@ -69,21 +69,24 @@ enum ROLES {
 #define STR2(X) #X
 #define STR(X) STR2(X)
 
-#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos)   \
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos, cnt)   \
     {       .op_A = (opA),                                  \
             .op_B = (opB),                                  \
             .layout = (layout_arr),                         \
             .state = (state_arr),                           \
-            .nFields = MAX_SLOTS(state_arr),                \
+	    .nFields = cnt,				    \
             .ic = (cursor_pos)                              \
     }
 
+
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
-#define SCREENS_LIST				\
-    YMB (LOGIN_SCREEN, login_screen)		\
-    YMB (MAIN_SCREEN, main_screen)		\
+#define SCREENS_LIST						\
+    YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)		\
+    YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)		\
 
+
+/* SCREEN STUBS */
 #define SCREEN_STUB_HEADER(SCR,title)				\
     LABEL(SCR##_USER,7,1,8, "DSP_USER")				\
     LABEL(SCR##_DATE,67,1,8, "DSP_DATE")			\
@@ -103,7 +106,7 @@ enum ROLES {
     HL(SCR##_FOOTER_HL3,7,24,90)			\
     INPUT(SCR##_ISELECT,6,24,1)                              
 
-/* col, row */
+/* LOGIN SCREEN col, row */
 #define LOGIN_SCREEN                                                    \
     LABEL(LOGIN_L1       , 9,   8, 27,     "USER . . . . . . . . . . . ") \
     LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ")     \
@@ -113,41 +116,45 @@ enum ROLES {
     LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE)    \
     STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)                      
 
-
 /*   id, col, row, width */
 /* #define MAIN_SCREEN                                             \ */
 
-/*         INPUT(MAIN_ISELECT,6,24,1)                              \ */
-
-
-/*         LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \ */
-/*         LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \ */
-/*     LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \ */
-/*     LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \ */
 
 
 #define MAIN_SCREEN \
-    SCREEN_STUB_HEADER(MAIN, Macabee Main Menu )			\
-    SCREEN_STUB_FOOTER(MAIN)			
+    SCREEN_STUB_HEADER(MAIN, Macabee Main Menu )	    \
+        LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \
+        LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \
+    LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
+    LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
+    SCREEN_STUB_FOOTER(MAIN)
+
+#define MAIN_SCREEN_ALPHA			\
+    SCREEN_STUB_HEADER(MAIN, Macabee Main Menu )	    \
+        LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \
+        LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \
+    LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
+    LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
+    SCREEN_STUB_FOOTER(MAIN)
 
 
 /* -------------------------------------------- END SCREEN DEFINTIONS --------------------------------------------- */
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
-#define YMB(SCR,scr) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
+#define YMB(SCR,scr, IC) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
 SCREENS_LIST
 #undef X
 #undef YMB
 
 
-#define YMB(SCR,scr) struct field_layout scr##_layout[] = {SCR};
+#define YMB(SCR,scr,IC) struct field_layout scr##_layout[100] = {SCR};   
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
 SCREENS_LIST
 #undef X
 #undef YMB
 
-#define YMB(SCR,scr) struct field_state scr##_state[] = {SCR};
+#define YMB(SCR,scr,IC) struct field_state scr##_state[100] = {SCR};
 #define X(id, t, x, y, w, txt, len, flg, col)               \
     { .field_id = (id), .text = (txt), .text_len = (len),   \
             .fg_color = (col), .flags = (flg) },
@@ -215,11 +222,15 @@ struct screen {
 /* |--------------------------------------- GLOBAL SCREEN TEMPLATES -------------------------------- */
 
 /* Global Screen templates:  */
-struct screen screens[] = {
-    [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state,LOGIN_IUSER),
-    [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT),
-    //    [SCR_MAIN_ALPHA] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
-};
+
+#define YMB(SCR,scr,IC) SCR##_ID,
+enum SCRID {SCREENS_LIST};
+#undef YMB
+
+#define YMB(SCR,scr,IC)		[SCR##_ID] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
+struct screen screens[] = {SCREENS_LIST};
+#undef YMB
+
 
 /* ---------------------------- World state management ------------------------------------ */
 
@@ -228,6 +239,7 @@ struct player {
     struct mg_connection *c;
     UT_hash_handle hh;
     u8 scrid;
+    struct screen scr;
     struct auth {
         time_t logintim;
         u8 attempts;
@@ -236,6 +248,7 @@ struct player {
         char uname[25];
         time_t locked_until;
     } auth;
+
 };
 
 /* 'players' is a pointer to a global hash table.  It is 
@@ -248,7 +261,7 @@ struct player *players = NULL;
 struct player *onboard_new_player(struct mg_connection *c) {
     struct player *player = (struct player*) malloc(sizeof(*player));
     player->c = c;
-    player->scrid = SCR_LOGIN;
+    player->scrid = LOGIN_SCREEN_ID;
     player->auth.logintim = 0;
     player->auth.attempts = 0;
     player->auth.role = 0;
@@ -282,7 +295,6 @@ void set_field_text(struct screen *scr, int field, char *value) {
 }
 
 
-
 void render_login_warning(struct player *player, char *txt) {
     struct screen scr;
     struct field_state buf[1];
@@ -309,7 +321,6 @@ void render_screen_template(struct player *player, u8 SCREEN) {
 }
 
 /* =============================== DATABASE DSL ====================================== */
-
 
 
 #define SQLITE_JOURNAL_MODE wal
@@ -895,11 +906,11 @@ void try_login(struct player *player, u8 *reqbuf) {
     }
     
     if (pw_check_from_db(db, usr.uid, password)) {
-        switch(usr.role) {
-        case ROLE_ALPHA:  { player->scrid = SCR_MAIN;  } break;
-        case ROLE_OFFICE: { player->scrid = SCR_MAIN; } break;
-        }
-        
+        /* switch(usr.role) { */
+        /* case ROLE_ALPHA:  { player->scrid = MAIN_SCREEN_ID;  } break; */
+        /* case ROLE_OFFICE: { player->scrid = MAIN_SCREEN_ID; } break; */
+        /* } */
+	player->scrid = MAIN_SCREEN_ID;
         player->auth.logintim = time(NULL);
         player->auth.attempts = 0;
         player->auth.role = usr.role;
@@ -931,20 +942,19 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
         /* Player is not yet added to the world. 
          * add player to the world and send initial login screen. */
         player = onboard_new_player(c);
-        render_screen_template(player, SCR_LOGIN);
+        render_screen_template(player, LOGIN_SCREEN_ID);
     } else {
         /* Player is in the world. Handler functions
          * aways set next scrid. */
         switch(player->scrid) { 
-        case SCR_LOGIN:         
+        case LOGIN_SCREEN_ID:         
             {
                 try_login(player,reqbuf);
 		render_screen_template(player, player->scrid);
             } break;
-        case SCR_MAIN:
-            {
-		render_screen_template(player, player->scrid);
-            } break;
+	case MAIN_SCREEN_ID:
+	    render_screen_template(player, player->scrid);
+
         }
 
     }

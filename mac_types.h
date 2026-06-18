@@ -60,9 +60,6 @@ struct __attribute__((packed)) field_state {
     char text[MAX_FLD_SIZE];
 };
 
-enum where_you_at {
-    SCR_LOGIN, SCR_MAIN, SCR_MAIN_ALPHA
-};
 
 enum permissions {
     ADMIN, CUSTOMER
