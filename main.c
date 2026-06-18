@@ -147,14 +147,14 @@ SCREENS_LIST
 #undef YMB
 
 
-#define YMB(SCR,scr,IC) struct field_layout scr##_layout[100] = {SCR};   
+#define YMB(SCR,scr,IC) struct field_layout scr##_layout[] = {SCR};   
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
 SCREENS_LIST
 #undef X
 #undef YMB
 
-#define YMB(SCR,scr,IC) struct field_state scr##_state[100] = {SCR};
+#define YMB(SCR,scr,IC) struct field_state scr##_state[] = {SCR};
 #define X(id, t, x, y, w, txt, len, flg, col)               \
     { .field_id = (id), .text = (txt), .text_len = (len),   \
             .fg_color = (col), .flags = (flg) },
@@ -216,6 +216,16 @@ struct screen {
     size_t nFields;
     struct field_layout *layout;
     struct field_state *state;
+
+};
+
+struct live_screen {
+    u8 op_A;
+    u8 op_B;
+    u8 ic;
+    size_t nFields;
+    struct field_layout layout[100];
+    struct field_state state[100];
 };
 
 
@@ -239,7 +249,7 @@ struct player {
     struct mg_connection *c;
     UT_hash_handle hh;
     u8 scrid;
-    struct screen scr;
+    struct live_screen scr;
     struct auth {
         time_t logintim;
         u8 attempts;
@@ -273,8 +283,10 @@ struct player *onboard_new_player(struct mg_connection *c) {
 }
 
 /* Wrapper around mg_ws_send */
-void mb_send (struct player *player, struct screen *scr) {
+void mb_send (struct player *player) {
     u8 buffer[4096];
+
+    struct live_screen *scr = &player->scr;
     struct net_payload_screen payload = serialize_screen(scr->state,
                                                          scr->layout,
                                                          scr->nFields,
@@ -296,13 +308,13 @@ void set_field_text(struct screen *scr, int field, char *value) {
 
 
 void render_login_warning(struct player *player, char *txt) {
-    struct screen scr;
+
     struct field_state buf[1];
 
-    scr.op_A = OP_A_UPDATE;
-    scr.op_B = OP_B_DEF;
-    scr.ic = LOGIN_IUSER;
-    scr.nFields = MAX_SLOTS(buf);
+    player->scr.op_A = OP_A_UPDATE;
+    player->scr.op_B = OP_B_DEF;
+    player->scr.ic = LOGIN_IUSER;
+    player->scr.nFields = MAX_SLOTS(buf);
         
     struct field_state f = login_screen_state[LOGIN_WARNING];
     f.fg_color = BROWN;
@@ -312,12 +324,8 @@ void render_login_warning(struct player *player, char *txt) {
     f.text_len = strlen(f.text);
     
     buf[0] = f;
-    scr.state = buf;
-    mb_send(player,&scr);
-}
-
-void render_screen_template(struct player *player, u8 SCREEN) {
-    mb_send(player, &screens[SCREEN]);    
+    /* player->scr.state = buf;	 */
+    mb_send(player);
 }
 
 /* =============================== DATABASE DSL ====================================== */
@@ -874,6 +882,22 @@ struct usr_rec new_usr_rec() {
     return usr;
 }
 
+void set_live_screen(struct player *player, enum SCRID scrid) {
+
+    struct screen tmpl = screens[scrid];
+    struct live_screen *scr = &player->scr;
+    player->scrid = scrid;
+    
+    scr->op_A = tmpl.op_A;
+    scr->op_B = tmpl.op_B;
+    scr->ic   = tmpl.ic;
+    scr->nFields = tmpl.nFields;
+
+    memcpy(scr->layout, tmpl.layout, tmpl.nFields * sizeof(struct field_layout));
+    memcpy(scr->state, tmpl.state, tmpl.nFields * sizeof(struct field_state));
+}
+
+
 void try_login(struct player *player, u8 *reqbuf) {
 
     /* Prevents login. 3 seconds after 3 missed attempts */
@@ -906,11 +930,7 @@ void try_login(struct player *player, u8 *reqbuf) {
     }
     
     if (pw_check_from_db(db, usr.uid, password)) {
-        /* switch(usr.role) { */
-        /* case ROLE_ALPHA:  { player->scrid = MAIN_SCREEN_ID;  } break; */
-        /* case ROLE_OFFICE: { player->scrid = MAIN_SCREEN_ID; } break; */
-        /* } */
-	player->scrid = MAIN_SCREEN_ID;
+	set_live_screen(player, MAIN_SCREEN_ID);
         player->auth.logintim = time(NULL);
         player->auth.attempts = 0;
         player->auth.role = usr.role;
@@ -942,7 +962,8 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
         /* Player is not yet added to the world. 
          * add player to the world and send initial login screen. */
         player = onboard_new_player(c);
-        render_screen_template(player, LOGIN_SCREEN_ID);
+	set_live_screen(player, LOGIN_SCREEN_ID);
+        mb_send(player);
     } else {
         /* Player is in the world. Handler functions
          * aways set next scrid. */
@@ -950,10 +971,10 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
         case LOGIN_SCREEN_ID:         
             {
                 try_login(player,reqbuf);
-		render_screen_template(player, player->scrid);
+		mb_send(player);
             } break;
 	case MAIN_SCREEN_ID:
-	    render_screen_template(player, player->scrid);
+	    mb_send(player);
 
         }
 
