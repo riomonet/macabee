@@ -16,7 +16,7 @@
 #include "uthash.h"
 
 
-#define UID_NF UINT16_MAX // UID NOT FOUND SENTINEL.
+#define UID_NF UINT16_MAX // UID NOT FOUND. [SENTINEL]
 
 sqlite3 *db;
 
@@ -79,31 +79,26 @@ enum ROLES {
     }
 
 
-#define ALL_SCREENS                             \
-    Y(LOGIN_SCREEN)                             \
-    Y(MAIN_SCREEN)                              \
-    Y(MAIN_SCREEN_ALPHA)                        \
-
-
-
 /* -------------------- LOGIN SCREEN --------------------- */
 
 /* col, row */
-#define LOGIN_SCREEN						\
+#define LOGIN_SCREEN                                                    \
     LABEL(LOGIN_L1           , 9,   8, 27,     "USER . . . . . . . . . . . ") \
-        LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ") \
-        INPUT(LOGIN_IUSER    , 38,  8, 24)                              \
-        INPUT_F(LOGIN_IPW    , 38, 10, 24,PASSWORD)                     \
-        LABEL_CF(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT,CYAN) \
-        LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE) \
-        STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)			\
-	
+    LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ")   \
+    INPUT(LOGIN_IUSER    , 38,  8, 24)                                  \
+    INPUT_F(LOGIN_IPW    , 38, 10, 24,PASSWORD)                         \
+    LABEL_CF(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT,CYAN) \
+    LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE)    \
+    STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)                      
+
+
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum LOGIN_SCR_IDX {
     LOGIN_SCREEN
     LOGIN_FIELD_COUNT
 };
 #undef X
+
 
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     [id] = { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
@@ -123,7 +118,7 @@ enum LOGIN_SCR_IDX {
 /* --------------------------------------------END LOGIN SCREENS ---------------------------------------------- */
 /* -------------------------------------------- MAIN SCREEN START --------------------------------------------- */
 /*   id, col, row, width */
-#define MAIN_SCREEN_FIELDS                                      \
+#define MAIN_SCREEN                                             \
     LABEL(MAIN_L1,7,1,8, "DSP_USER")                            \
         LABEL(MAIN_L2,67,1,8, "DSP_DATE")                       \
         LABEL(MAIN_L3,67,2,8, "DSP_TIME")                       \
@@ -146,7 +141,7 @@ enum LOGIN_SCR_IDX {
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
 enum MAIN_SCR_IDX {
-    MAIN_SCREEN_FIELDS
+    MAIN_SCREEN
     MAIN_FIELD_COUNT
 };
 #undef X
@@ -154,7 +149,7 @@ enum MAIN_SCR_IDX {
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
     struct field_layout main_screen_layout[] = {
-        MAIN_SCREEN_FIELDS 
+        MAIN_SCREEN
     };
 #undef X
 
@@ -162,7 +157,7 @@ enum MAIN_SCR_IDX {
     { .field_id = (id), .text = (txt), .text_len = (len),   \
             .fg_color = (col), .flags = (flg) },
     struct field_state main_screen_state[] = {
-        MAIN_SCREEN_FIELDS
+        MAIN_SCREEN
     };
 #undef X
 
