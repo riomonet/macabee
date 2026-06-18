@@ -35,13 +35,13 @@ enum ROLES {
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
 
-#define LABEL(id, xx, yy, ww, txt) \
+#define LABEL(id, xx, yy, ww, txt)				\
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0)
 
-#define INPUT(id, xx, yy, ww)                  \
+#define INPUT(id, xx, yy, ww)			\
     X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0)
 
-#define INPUT_F(id, xx, yy, ww,flg)                  \
+#define INPUT_F(id, xx, yy, ww,flg)		\
     X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0)
 
 #define HL(id, xx, yy, ww)                      \
@@ -50,19 +50,19 @@ enum ROLES {
 #define LABEL_F(id, xx, yy, ww, txt, flg)                       \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0)
 
-#define LABEL_C(id, xx, yy, ww, txt, col) \
+#define LABEL_C(id, xx, yy, ww, txt, col)			\
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col)
 
-#define LABEL_CF(id, xx, yy, ww, txt, flg, col) \
+#define LABEL_CF(id, xx, yy, ww, txt, flg, col)			\
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col)
 
-#define STATUS(id, xx, yy, ww, txt, flg) \
+#define STATUS(id, xx, yy, ww, txt, flg)	\
     LABEL_F(id, xx, yy, ww, txt, flg)
 
-#define STATE(id, txt, flg, col) \
+#define STATE(id, txt, flg, col)		\
     X(id, txt, sizeof(txt)-1, flg, col)
 
-#define STATE_LEN(id, txt, len, flg, col) \
+#define STATE_LEN(id, txt, len, flg, col)	\
     X(id, txt, len, flg, col)
 
 #define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -78,91 +78,82 @@ enum ROLES {
             .ic = (cursor_pos)                              \
     }
 
+/* -------------------- SCREEN DEFINTIONS START--------------------- */
 
-/* -------------------- LOGIN SCREEN --------------------- */
+#define SCREENS_LIST				\
+    YMB (LOGIN_SCREEN, login_screen)		\
+    YMB (MAIN_SCREEN, main_screen)		\
+
+#define SCREEN_STUB_HEADER(SCR,title)				\
+    LABEL(SCR##_USER,7,1,8, "DSP_USER")				\
+    LABEL(SCR##_DATE,67,1,8, "DSP_DATE")			\
+    LABEL(SCR##_TIME,67,2,8, "DSP_TIME")			\
+    LABEL(SCR##_TITLE,29,1,21, STR(title))			\
+    LABEL(SCR##_MENU_NAME,35,2,9, STR(SCR) " MENU")		\
+    LABEL_CF(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
+
+#define SCREEN_STUB_FOOTER(SCR)				\
+    LABEL(SCR##FOOTER_SELECTION,1,23,9,"Selection")	\
+    LABEL(SCR##FOOTER_ARROW,1,24,4, "-->")		\
+    HL(SCR##_FOOTER_HL1,1,26,100)			\
+    LABEL(MAIN_L14,6,28,9,"F6=Logout")			\
+    LABEL(MAIN_L15,19,28,9, "F7=Search")		\
+    LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")		\
+    HL(SCR##_FOOTER_HL2,0,29,100)			\
+    HL(SCR##_FOOTER_HL3,7,24,90)			\
+    INPUT(SCR##_ISELECT,6,24,1)                              
 
 /* col, row */
 #define LOGIN_SCREEN                                                    \
-    LABEL(LOGIN_L1           , 9,   8, 27,     "USER . . . . . . . . . . . ") \
-    LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ")   \
-    INPUT(LOGIN_IUSER    , 38,  8, 24)                                  \
-    INPUT_F(LOGIN_IPW    , 38, 10, 24,PASSWORD)                         \
+    LABEL(LOGIN_L1       , 9,   8, 27,     "USER . . . . . . . . . . . ") \
+    LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ")     \
+    INPUT(LOGIN_IUSER    , 38,  8, 24)                                    \
+    INPUT_F(LOGIN_IPW    , 38, 10, 24,  PASSWORD)                         \
     LABEL_CF(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT,CYAN) \
     LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE)    \
     STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)                      
 
 
-#define X(id, t, x, y, w, txt, len, flg, col) id,
-enum LOGIN_SCR_IDX {
-    LOGIN_SCREEN
-    LOGIN_FIELD_COUNT
-};
-#undef X
-
-
-#define X(id, t, xx, yy, w, txt, len, flg, col)                         \
-    [id] = { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
-    struct field_layout login_screen_layout[] = {
-        LOGIN_SCREEN
-    };
-#undef X
-
-#define X(id, t, x, y, w, txt, len, flg, col)               \
-   [id] = { .field_id = (id), .text = (txt), .text_len = (len),   \
-            .fg_color = (col), .flags = (flg) },
-    struct field_state login_screen_state[] = {
-        LOGIN_SCREEN
-    }; 
-#undef X
-
-/* --------------------------------------------END LOGIN SCREENS ---------------------------------------------- */
-/* -------------------------------------------- MAIN SCREEN START --------------------------------------------- */
 /*   id, col, row, width */
-#define MAIN_SCREEN                                             \
-    LABEL(MAIN_L1,7,1,8, "DSP_USER")                            \
-        LABEL(MAIN_L2,67,1,8, "DSP_DATE")                       \
-        LABEL(MAIN_L3,67,2,8, "DSP_TIME")                       \
-        INPUT(MAIN_ISELECT,6,24,1)                              \
-        LABEL(MAIN_L4,29,1,21, "Marina Access Control")         \
-        LABEL(MAIN_L5,35,2,9, "MAIN MENU")                      \
-        LABEL(MAIN_L6,6,6,28, "Select one of the following:")   \
-        LABEL(MAIN_L7,10,8,15,   "1. Add customer")             \
-        LABEL(MAIN_L8,10,9,17,   "2. View customers")           \
-    LABEL(MAIN_L9,10,10,17,  "3. Access history")               \
-    LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
-    LABEL(MAIN_L11,1,23,9,"Selection")                          \
-    LABEL(MAIN_L12,1,24,4, "===>")                              \
-    HL(MAIN_HL1,1,26,100)                                       \
-    LABEL(MAIN_L14,6,28,9,"F6=Logout")                          \
-    LABEL(MAIN_L15,19,28,9, "F7=Search")                        \
-    LABEL(MAIN_L16,31,28,16,"F8=Redraw screen")                 \
-    HL(MAIN_HL2,0,29,100)					\
-    HL(MAIN_HL3,7,24,90)                                     
+/* #define MAIN_SCREEN                                             \ */
+
+/*         INPUT(MAIN_ISELECT,6,24,1)                              \ */
+
+
+/*         LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \ */
+/*         LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \ */
+/*     LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \ */
+/*     LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \ */
+
+
+#define MAIN_SCREEN \
+    SCREEN_STUB_HEADER(MAIN, Macabee Main Menu )			\
+    SCREEN_STUB_FOOTER(MAIN)			
+
+
+/* -------------------------------------------- END SCREEN DEFINTIONS --------------------------------------------- */
 
 #define X(id, t, x, y, w, txt, len, flg, col) id,
-enum MAIN_SCR_IDX {
-    MAIN_SCREEN
-    MAIN_FIELD_COUNT
-};
+#define YMB(SCR,scr) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
+SCREENS_LIST
 #undef X
+#undef YMB
 
+
+#define YMB(SCR,scr) struct field_layout scr##_layout[] = {SCR};
 #define X(id, t, xx, yy, w, txt, len, flg, col)                         \
     { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
-    struct field_layout main_screen_layout[] = {
-        MAIN_SCREEN
-    };
+SCREENS_LIST
 #undef X
+#undef YMB
 
+#define YMB(SCR,scr) struct field_state scr##_state[] = {SCR};
 #define X(id, t, x, y, w, txt, len, flg, col)               \
     { .field_id = (id), .text = (txt), .text_len = (len),   \
             .fg_color = (col), .flags = (flg) },
-    struct field_state main_screen_state[] = {
-        MAIN_SCREEN
-    };
+SCREENS_LIST
 #undef X
-
-/* -------------------------------------------- MAIN SCREEN END --------------------------------------------- */
-
+#undef YMB
 
 struct net_payload_screen {
     int id;
@@ -227,7 +218,7 @@ struct screen {
 struct screen screens[] = {
     [SCR_LOGIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, login_screen_layout, login_screen_state,LOGIN_IUSER),
     [SCR_MAIN] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT),
-    [SCR_MAIN_ALPHA] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
+    //    [SCR_MAIN_ALPHA] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, main_screen_layout, main_screen_state,MAIN_ISELECT)
 };
 
 /* ---------------------------- World state management ------------------------------------ */
@@ -285,10 +276,17 @@ void mb_send (struct player *player, struct screen *scr) {
      
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
+
+void set_field_text(struct screen *scr, int field, char *value) {
+    strcpy(scr->state[field].text, value);
+}
+
+
+
 void render_login_warning(struct player *player, char *txt) {
     struct screen scr;
     struct field_state buf[1];
-    
+
     scr.op_A = OP_A_UPDATE;
     scr.op_B = OP_B_DEF;
     scr.ic = LOGIN_IUSER;
@@ -305,7 +303,6 @@ void render_login_warning(struct player *player, char *txt) {
     scr.state = buf;
     mb_send(player,&scr);
 }
-
 
 void render_screen_template(struct player *player, u8 SCREEN) {
     mb_send(player, &screens[SCREEN]);    
@@ -347,10 +344,9 @@ typedef char pw_t[PW_HASH_T];
 /* TABLE INDEX */
 #define DB_TABLES                               \
     X(usr,   USR_SCHEMA)                        \
-        X(sys_state,  SYS_STATE_SCHEMA)         \
-        X(pw,  PW_SCHEMA)		
+    X(sys_state,  SYS_STATE_SCHEMA)		\
+    X(pw,  PW_SCHEMA)		
 
-  /*  */
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 #define SYS_STATE_SCHEMA                                    \
@@ -927,8 +923,7 @@ void try_login(struct player *player, u8 *reqbuf) {
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
 
     (void) reqbuflen;
-        
-    
+
     struct player *player = NULL;
     HASH_FIND_PTR(players,&c, player);
 
@@ -940,21 +935,15 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
     } else {
         /* Player is in the world. Handler functions
          * aways set next scrid. */
-        render_screen_template(player, player->scrid);
         switch(player->scrid) { 
         case SCR_LOGIN:         
             {
                 try_login(player,reqbuf);
+		render_screen_template(player, player->scrid);
             } break;
         case SCR_MAIN:
             {
-                switch(player->auth.role) {
-                case ROLE_ALPHA:
-
-                    break;
-                case ROLE_OFFICE:     
-                    break;
-                }
+		render_screen_template(player, player->scrid);
             } break;
         }
 
@@ -1204,6 +1193,7 @@ int main(void) {
 
     db = init_db();
     create_tables(db);
+
     #ifndef DEV_MODE
     require_root(db);
     #endif
