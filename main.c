@@ -87,12 +87,11 @@ enum ROLES {
 
 
 /* SCREEN STUBS */
-#define SCREEN_STUB_HEADER(SCR,title)				\
-    LABEL(SCR##_USER,7,1,8, "DSP_USER")				\
-    LABEL(SCR##_DATE,67,1,8, "DSP_DATE")			\
-    LABEL(SCR##_TIME,67,2,8, "DSP_TIME")			\
-    LABEL(SCR##_TITLE,29,1,21, STR(title))			\
-    LABEL(SCR##_MENU_NAME,35,2,9, STR(SCR) " MENU")		\
+#define SCREEN_STUB_HEADER(SCR,title)					\
+    LABEL(SCR##_FLD_USER,7,1,8, "")					\
+    LABEL(SCR##_FLD_DATE,67,1,8, "")					\
+    LABEL(SCR##_FLD_TIME,67,2,8, "")					\
+    LABEL(SCR##_FLD_TITLE,29,1,21, title)				\
     LABEL_CF(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
 #define SCREEN_STUB_FOOTER(SCR)				\
@@ -119,10 +118,8 @@ enum ROLES {
 /*   id, col, row, width */
 /* #define MAIN_SCREEN                                             \ */
 
-
-
 #define MAIN_SCREEN \
-    SCREEN_STUB_HEADER(MAIN, Macabee Main Menu )	    \
+    SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )	    \
         LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \
         LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \
     LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
@@ -130,7 +127,7 @@ enum ROLES {
     SCREEN_STUB_FOOTER(MAIN)
 
 #define MAIN_SCREEN_ALPHA			\
-    SCREEN_STUB_HEADER(MAIN, Macabee Main Menu )	    \
+    SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )	    \
         LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \
         LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \
     LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
@@ -233,11 +230,11 @@ struct live_screen {
 
 /* Global Screen templates:  */
 
-#define YMB(SCR,scr,IC) SCR##_ID,
+#define YMB(SCR,scr,IC) IN_##SCR,
 enum SCRID {SCREENS_LIST};
 #undef YMB
 
-#define YMB(SCR,scr,IC)		[SCR##_ID] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
+#define YMB(SCR,scr,IC)	[IN_##SCR] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
 struct screen screens[] = {SCREENS_LIST};
 #undef YMB
 
@@ -271,7 +268,7 @@ struct player *players = NULL;
 struct player *onboard_new_player(struct mg_connection *c) {
     struct player *player = (struct player*) malloc(sizeof(*player));
     player->c = c;
-    player->scrid = LOGIN_SCREEN_ID;
+    player->scrid = IN_LOGIN_SCREEN;
     player->auth.logintim = 0;
     player->auth.attempts = 0;
     player->auth.role = 0;
@@ -897,13 +894,43 @@ void set_live_screen(struct player *player, enum SCRID scrid) {
     memcpy(scr->state, tmpl.state, tmpl.nFields * sizeof(struct field_state));
 }
 
+void goto_main_screen(struct player *player) {
 
-void try_login(struct player *player, u8 *reqbuf) {
+    set_live_screen(player, IN_MAIN_SCREEN);
+    
+    player->scr.state[MAIN_SCREEN_FLD_USER].text_len = strlen(player->auth.uname);
+    strcpy(player->scr.state[MAIN_SCREEN_FLD_USER].text, player->auth.uname);
+
+    player->scr.state[MAIN_SCREEN_FLD_DATE].text_len = strlen("10/1/20");
+    strcpy(player->scr.state[MAIN_SCREEN_FLD_DATE].text, "10/1/20");
+
+    //set user name
+    //set date
+    //set time with seconds.....
+    
+    mb_send(player);    
+}
+
+
+void goto_main_screen_alpha(struct player *player) {
+    set_live_screen(player, IN_MAIN_SCREEN);
+    // set user name
+    // set date
+    // set time with seconds.....
+    mb_send(player);    
+}
+
+void goto_login_screen(struct player *player) {
+    set_live_screen(player, IN_LOGIN_SCREEN);
+    mb_send(player);    
+}
+
+int try_login(struct player *player, u8 *reqbuf) {
 
     /* Prevents login. 3 seconds after 3 missed attempts */
     if (time(NULL) < player->auth.locked_until) {
 	render_login_warning(player, "Login lockout for 3 seconds.");
-	return;
+	return 0;
     }
         
     struct login_attempt *attempt = (struct login_attempt*) reqbuf;
@@ -930,25 +957,27 @@ void try_login(struct player *player, u8 *reqbuf) {
     }
     
     if (pw_check_from_db(db, usr.uid, password)) {
-	set_live_screen(player, MAIN_SCREEN_ID);
         player->auth.logintim = time(NULL);
         player->auth.attempts = 0;
         player->auth.role = usr.role;
         player->auth.uid = usr.uid;
         strcpy(player->auth.uname, usr.uname);
         player->auth.locked_until = 0;
+	return 1;
     } else {
         player->auth.attempts++;
         printf("failed\n");
+	return 0;
     }
 
     /* Verify both input fields were submitted.. */
     if (attempt->head.nFields < 2) {
         player->auth.attempts++;
         render_login_warning(player, "All fields required.");
-        return;
+        return 0;
     }
 }
+
 
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
@@ -958,26 +987,31 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
     struct player *player = NULL;
     HASH_FIND_PTR(players,&c, player);
 
-    if (!player) {              
-        /* Player is not yet added to the world. 
-         * add player to the world and send initial login screen. */
+    /* Player is not yet added to the world.  Add player to the world and send initial login screen. */
+    if (!player) { 
         player = onboard_new_player(c);
-	set_live_screen(player, LOGIN_SCREEN_ID);
-        mb_send(player);
-    } else {
-        /* Player is in the world. Handler functions
-         * aways set next scrid. */
+	goto_login_screen(player);
+
+    } 	/* Player is in the world.  The cases are responses to MAIN_SCREEN_ID*/ else {
         switch(player->scrid) { 
-        case LOGIN_SCREEN_ID:         
+
+	case IN_LOGIN_SCREEN:         
             {
-                try_login(player,reqbuf);
-		mb_send(player);
+		if (try_login(player,reqbuf)) {
+		    switch (player->auth.role) {
+		    default : goto_main_screen(player); break;
+		    }
+		} else {
+		    break;
+		}
             } break;
-	case MAIN_SCREEN_ID:
-	    mb_send(player);
-
-        }
-
+	case IN_MAIN_SCREEN:
+	    {
+		//get_next_screen(player)
+		//get_AID_KEY();
+		goto_main_screen(player);
+	    } break;
+	}
     }
 }
 
@@ -1163,6 +1197,7 @@ void root_menu(sqlite3 *db) {
         console_add_admin(db);
     }
 }
+
 
 /* Root password required for startup */
 void require_root(sqlite3 *db) {
