@@ -255,7 +255,6 @@ struct player {
         char uname[25];
         time_t locked_until;
     } auth;
-
 };
 
 /* 'players' is a pointer to a global hash table.  It is 
@@ -903,13 +902,16 @@ void today(char *buf, int len) {
 
 }
 
-
-
+void time_now(char *buf, int len) {
+    time_t now = time(NULL);
+    struct tm *tm = localtime(&now);
+    strftime(buf, len, "%H:%M:%S", tm);
+}
+    
 void set_screen_text(struct player *player, int col, char *txt) {
     player->scr.state[col].text_len = strlen(txt);
     strcpy(player->scr.state[col].text, txt);
 }
-
 
 #define TITLE_BAR(SCR)					\
     char user[32];					\
@@ -919,8 +921,6 @@ void set_screen_text(struct player *player, int col, char *txt) {
     today(date, sizeof(date));				\
     set_screen_text(player,SCR##_FLD_DATE, date);
 
-
-
 void goto_main_screen(struct player *player) {
     set_live_screen(player, IN_MAIN_SCREEN);
     TITLE_BAR(MAIN_SCREEN)
@@ -928,6 +928,30 @@ void goto_main_screen(struct player *player) {
     mb_send(player);    
 }
 
+/* On  update just send the correct opcdoe and thee  */
+void mb_update(struct player *player, int nFields, int IC, struct field_state *update) {
+
+    player->scr.op_A = OP_A_UPDATE;
+    player->scr.op_B = OP_B_DEF;
+    player->scr.ic = IC;
+    player->scr.nFields = nFields;
+    memset(player->scr.state,0,100*sizeof(struct field_state));
+    memcpy(player->scr.state,update,nFields*sizeof(struct field_state));
+    mb_send(player);
+}
+
+
+void tick(char *time) {
+    struct player *p = players;
+    for(p = players; p != NULL; p = p->hh.next) {
+        if(p->scrid == IN_MAIN_SCREEN) {
+            struct field_state f[] = {main_screen_state[MAIN_SCREEN_FLD_TIME]};
+            f[0].text_len = strlen(time);
+    strcpy(f[0].text, time);
+            mb_update(p,1,MAIN_ISELECT,f);
+        }
+    }
+}
 
 void goto_main_screen_alpha(struct player *player) {
     set_live_screen(player, IN_MAIN_SCREEN);
@@ -994,7 +1018,6 @@ int try_login(struct player *player, u8 *reqbuf) {
         return 0;
     }
 }
-
 
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
@@ -1285,8 +1308,20 @@ int main(void) {
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
 
+    time_t last_tick = time(NULL);
+    
     for(;;) {
     	mg_mgr_poll(&mgr,1000);
+
+        time_t now = time(NULL);
+        
+        if (now != last_tick) {
+            last_tick = now;
+            //tick(now);
+            char time[32];
+            time_now(time, 32);
+            tick(time);
+        }
     }
     return 0;
     sqlite3_close(db);
