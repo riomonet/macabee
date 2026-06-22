@@ -1,0 +1,11 @@
+/macabee
+/macabee-debug
+/main.o
+/mongoose.o
+/sqlite3.o
+/model
+/mb_data.db-wal
+/mb_data.db-shm
+/mb_data.db
+/a.out
+/LATEST (1).tar.gz

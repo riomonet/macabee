@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+
+         body {
+             background-color: var(--theme-bg);
+             color: var(--theme-fg);
+         }
+
+         .generic-slot:focus {
+             outline: none;
+             box-shadow: none;
+         }
+         
+         .generic-slot {
+             position: absolute;
+             font-family: monospace;
+             font-size: 16px; /*android only*/
+             border: none;
+             background: transparent;
+             padding: 0;
+             margin: 0;
+             height: auto;
+             color: inherit;     
+             
+             /* Drive coordinates using typography-grid registers */
+             top: calc(var(--row) * 1em);
+             left: calc(var(--col) * 1ch);
+             width: calc(var(--width) * 1ch);
+         }
+
+         /* Rigid input tracking frame */
+         .generic-slot:not([readonly]) {
+             border-bottom: 1px solid currentColor; /* underline visible inputs */
+         }
+         .generic-slot[data-bold]      { font-weight:     bold;      }
+         .generic-slot[data-faint]     { opacity:         0.5;       }
+         .generic-slot[data-underline] { text-decoration: underline; }
+         .generic-slot[data-hidden]    { visibility:      hidden;    }
+
+
+         .generic-slot[data-blink]     {
+             animation: terminal-blink 1s step-end infinite;         }
+
+         @keyframes terminal-blink    {
+             0%, 100% { visibility: visible; }
+             50%      { visibility: hidden;  }                       }
+
+         .generic-slot.hline {
+             pointer-events: none; 
+             user-select: none;   
+             border-bottom: 1px solid currentColor; 
+         }
+
+
+         /* --- Foreground Hardware Register Map --- */
+
+         .generic-slot[data-fg="1"] { color: #aa0000; } /* RED: 170, 0, 0 */
+         .generic-slot[data-fg="2"] { color: #003300; } /* GREEN: 0, 170, 0 (Bright green target) */
+         .generic-slot[data-fg="3"] { color: #aa5500; } /* BROWN: 170, 85, 0 */
+         .generic-slot[data-fg="4"] { color: #0000aa; } /* BLUE: 0, 0, 170 */
+         .generic-slot[data-fg="5"] { color: #6241b4; } /* MAGENTA: 98, 65, 180 */
+         .generic-slot[data-fg="6"] { color: #55ffff; } /* CYAN: 85, 255, 255 */
+         .generic-slot[data-fg="7"] { color: #ffffff; } /* WHITE: standard system bright white \033[97m */
+         .generic-slot[data-fg="8"] { color: #ffac00; } /* AMBER: 255, 172, 0 */
+         .generic-slot[data-fg="9"] { color: #000000; } /* BLACK: 0, 0, 0 */
+
+         /* --- Background Hardware Register Map --- */
+
+         .generic-slot[data-bg="1"] { background-color: #aa0000; } /* RED: 170, 0, 0 */
+         .generic-slot[data-bg="2"] { background-color: #00aa00; } /* GREEN: 0, 170, 0 (Darker green background target) */
+         .generic-slot[data-bg="3"] { background-color: #aa5500; } /* BROWN: 170, 85, 0 */
+         .generic-slot[data-bg="4"] { background-color: #0000aa; } /* BLUE: 0, 0, 170 */
+         .generic-slot[data-bg="5"] { background-color: #ff00ff; } /* MAGENTA: 255, 0, 255 */
+         .generic-slot[data-bg="6"] { background-color: #55ffff; } /* CYAN: 85, 255, 255 */
+         .generic-slot[data-bg="7"] { background-color: #ffffff; } /* WHITE: standard system background \033[107m */
+         .generic-slot[data-bg="8"] { background-color: #ffa500; } /* AMBER: 255, 165, 0 */
+         .generic-slot[data-bg="9"] { background-color: #000000; } /* BLACK: 0, 0, 0 */
+        </style>
+    </head>
+    <body>
+        <div id="terminal"></div>
+        <script>
+         
+         const MAX_SLOTS = 100;
+         const INPUTS  = [];
+         const SLOT_POOL = new Array(MAX_SLOTS);
+         const terminal = document.getElementById('terminal');
+         const url = "ws://192.168.1.21:8001/ws"
+         const VIEWPORT_TOP_ROWS = 4; // android only
+
+          
+         for (let i = 0; i < MAX_SLOTS; i++) {
+	         const input = document.createElement('input');
+
+             input.layout = {
+                 id: 0,
+                 typ: 0,
+                 col: 0,
+                 row: 0,
+                 width: 0,
+                 r1: 0,
+                 r2: 0,
+                 r3: 0
+             };
+
+              input.state = {
+                  id: 0,
+                  flags: 0,
+                  fgColor: 0,
+                  bgColor: 0,
+                  len: 0,
+                  r1: 0,
+                  r2: 0,
+                  r3: 0
+              };
+
+             input.className = 'generic-slot';
+             
+             input.style.setProperty('--row', 0);
+             input.style.setProperty('--col', 0);
+             input.style.setProperty('--width', 0);
+             input.toggleAttribute('data-hidden',true);
+             
+	         input.disabled= true;
+	         input.tabIndex = -1;
+	         input.slotId = i;
+	         input.isDirty = false;
+             input.autocomplete = 'off';
+             input.spellcheck = false;
+             input.autocorrect = 'off';
+             input.autocapitalize = 'off';
+             
+	         terminal.appendChild(input);
+	         SLOT_POOL[i] = input;
+         }
+         
+         const socket = sys_net_init(url);
+         disableTabDefaults();
+         add_AID_keys();
+
+
+         const AID_KEYS = Object.freeze ({
+             'Enter': 0xFF,
+             'F1':    0xF1,
+             'F2':    0xF2,
+             'F3':    0xF3,
+             'F4':    0xF4,
+             'F5':    0xF5,
+             'F6':    0xF6,
+             'F7':    0xF7,
+             'F8':    0xF8,
+             'F9':    0xF9,
+             'F10':   0x7A,
+             'F11':   0x7B,
+             'F12':   0x7C,
+         });
+
+         const OPCODE_A = Object.freeze ({
+             NEW:    0x01,
+             UPDATE: 0x02
+         });
+
+          // THESE VALUES ARE ONLY USED FOR SETTING
+          // SCREEN DEFAULTS
+         const COLORS = Object.freeze ({
+             BLACK:   '#000000',
+             RED:     '#aa0000',
+             GREEN:   '#00aa00',
+             BROWN:   '#aa5500',
+             BLUE:    '#0000aa',
+             MAGENTA: '#ff00ff',
+             CYAN:    '#55ffff',
+             WHITE:   '#ffffff',
+             AMBER:   '#ffac00'
+         });
+
+          const defColorsGlobal = {
+             bg: COLORS.BLUE,
+             fg: COLORS.WHITE
+         };
+
+         document.body.style.setProperty('--theme-bg', defColorsGlobal.bg);
+         document.body.style.setProperty('--theme-fg', defColorsGlobal.fg);
+
+
+          // These are indexes into the data-registers above.
+          // set during runtime.
+         const COLREG = Object.freeze ({
+             RED:     1,
+             GREEN:   2,
+             BROWN:   3,
+             BLUE:    4,
+             MAGENTA: 5,
+             CYAN:    6,
+             WHITE:   7,
+             AMBER:   8,
+             BLACK:   9,
+         });
+
+
+         const OPCODE_C = Object.freeze ({
+             STD:    0x01
+         });
+
+
+         const DSP = Object.freeze({
+             BOLD:      1 << 0,
+             FAINT:     1 << 1,
+             INVERSE:   1 << 2,
+             BLINK:     1 << 3,
+             UNDERLINE: 1 << 4,
+             HIDDEN:    1 << 5,
+             H_LINE:    1 << 6,
+             PASSWORD:  1 << 7
+         });
+
+          const FLAGS_H = Object.freeze({
+              CLICKABLE:  1 << 0,
+          });
+
+         const TYP = Object.freeze({
+             INPUT: 1 << 0,
+             LABEL: 1 << 1,
+             HLINE: 1 << 2,
+         });
+
+         function globalReset() {
+             INPUTS.length = 0;
+             for (let i = 0; i < MAX_SLOTS; i++) {
+                 const handle = SLOT_POOL[i];
+                 handle.isDirty = false;
+                 handle.disabled = true;
+                 handle.type = "text";
+                 handle.classList.remove('label', 'hline');
+                 handle.oninput = null;
+                 handle.onclick = null;
+                 handle.tabIndex = -1;
+                 handle.value = "";
+                 handle.style.setProperty('--row', 0);
+                 handle.style.setProperty('--col', 0);
+                 handle.style.setProperty('--width', 0);
+                 handle.toggleAttribute('data-hidden',true);
+             }
+         }
+                          
+         /* Manually manage active focus change on tab key andhsift tab */
+         function  disableTabDefaults() {
+             terminal.addEventListener('keydown', function(e) {
+                 if (e.key !== 'Tab') return;
+                 e.preventDefault();
+                 if (INPUTS.length === 0) return;
+                 
+                 const current = document.activeElement;
+                 let idx = INPUTS.indexOf(current);
+                 if (e.shiftKey) {
+                     idx--;
+                     if (idx < 0) {
+                         idx = INPUTS.length - 1;
+                     }
+                 } else {
+                     idx++;
+                     if (idx >= INPUTS.length)
+                         idx = 0;
+                 }
+                 INPUTS[idx].focus();
+             });
+         }
+
+
+         /* Header */
+         /* opcodeC |AID Key 1b| nFields | */
+         /* Field blocks */
+         /* |field_id 1b| field_len 1b| field_val | */
+          function send_changed_inputs_only(key) {
+              const field_len = 24; //fixed width.
+              const MDT = []; // array that will be sent to server of inputs.
+              let bytes = 0;
+              const encoder = new TextEncoder();
+              const AID = AID_KEYS[key];
+              bytes++; /* Opocde C */
+              bytes++; /* AIDkey 1b*/
+              bytes++; /* nFields 1b*/
+
+              for (let i = 0; i < INPUTS.length; i++) {
+		          if (INPUTS[i].value.trim() === '') {
+		              INPUTS[i].isDirty = false;
+		          }
+                  if (INPUTS[i].isDirty) {
+                      MDT.push(INPUTS[i]);
+                      bytes++; /* field_id 1b*/
+                      bytes++; /* field_len 1b*/
+                      bytes += field_len;
+                  }
+              }
+              
+             const buffer = new ArrayBuffer(bytes);
+             const copybook = new Uint8Array(buffer);
+             let pos = 0;
+             copybook[pos++] = OPCODE_C.STD;
+             copybook[pos++] = AID; //aidkey resolve
+             copybook[pos++] = MDT.length; // nfields
+             for(let i = 0; i <  MDT.length; i++) {
+                 copybook[pos++] = MDT[i].state.id;
+                 copybook[pos++] = MDT[i].value.length;
+                 const text = encoder.encode(MDT[i].value);
+                 copybook.set(text, pos);
+                 //                 pos += text.length;
+                 pos+=24;
+             }
+             socket.send(buffer);
+          }
+
+          function clickable(e) {
+              send_changed_inputs_only(this.state.id);
+          }
+          
+          function add_key_event_listeners(key, event, callback) {
+	         terminal.addEventListener(event, function(e) {
+                 if (e.key === key) {
+		             e.preventDefault();
+		             callback(key);
+                 }
+	         });
+         }
+          
+         function add_AID_keys() {
+	         add_key_event_listeners('Enter', 'keydown', send_changed_inputs_only);
+         }
+
+         function set_dirty() {
+	         this.isDirty = true;
+         }
+
+          const stateBufferLength = 120; // this should be probably set in the message.
+          const stateHeaderLength = 8;
+          
+          function sys_update_terminal(view) {
+             const decoder          = new TextDecoder('utf-8');
+             const headerSize       = 8;
+             const opcodeB          = view.getUint8(1);
+             const fieldCount       = view.getUint8(2);
+             const reserved         = view.getUint8(3);
+             const layoutBytesSz    = view.getUint16(4,true); 
+             const stateBytesSz     = view.getUint16(6,true);
+             const stateBase        = headerSize;
+             const state_struct     = stateBufferLength + stateHeaderLength;
+             const IC               = reserved; /* Initial cursor flag */
+             for (let i             = 0; i < fieldCount; i++) {
+                 const stateOffset  = stateBase + (i * state_struct);
+                 const stateId   = view.getUint8(stateOffset + 0);
+
+                 const flags     = view.getUint8(stateOffset + 1);
+                 const fgColor   = view.getUint8(stateOffset + 2);
+                 const bgColor   = view.getUint8(stateOffset + 3);
+                 const textLen   = view.getUint8(stateOffset + 4);
+                 const stateR1   = view.getUint8(stateOffset + 5);
+                 const stateR2   = view.getUint8(stateOffset + 6);
+                 const stateR3   = view.getUint8(stateOffset + 7);
+                 //
+                 const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
+
+                 const handle = SLOT_POOL[stateId];
+
+                 handle.state.flags = flags;
+                 handle.state.fgColor = fgColor;
+                 handle.state.bgColor = bgColor;
+
+                 handle.state.len = textLen;
+
+		         handle.value = decoder.decode(textBytes);
+                 
+                 handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); 
+                 handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
+                 handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
+                 handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
+                 handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
+                 if(handle.state.flags & DSP.PASSWORD) { handle.type = "password"};
+
+                 handle.setAttribute('data-fg', handle.state.fgColor);
+                 handle.setAttribute('data-bg', handle.state.bgColor);
+
+                 if (handle.state.flags & DSP.INVERSE) {
+                     handle.state.inverse = true;
+                     handle.setAttribute('data-fg', (handle.state.bgColor || defColors.bg));
+                     handle.setAttribute('data-bg', (handle.state.fgColor || defColors.fg));
+                 } else {
+                     if (handle.state.inverse) {
+                         handle.state.inverse = false;
+                         handle.setAttribute('data-fg', (handle.state.fgColor || defColors.fg));
+                         handle.setAttribute('data-bg', (handle.state.bgColor || defColors.bg));
+                     }
+                 }
+             }
+         }
+
+         function sys_render_terminal(view) {
+
+	     const decoder          = new TextDecoder('utf-8');
+	     const headerSize       = 8;
+             const opcodeB          = view.getUint8(1);
+             const fieldCount       = view.getUint8(2);
+             const reserved         = view.getUint8(3);
+             const layoutBytesSz    = view.getUint16(4,true);
+             const stateBytesSz     = view.getUint16(6,true);
+             const layoutBase       = headerSize;
+             const stateBase        = layoutBase + layoutBytesSz;
+
+             const layout_struct    = 8;
+             const state_struct     = stateBufferLength + stateHeaderLength;
+             const IC               = -1; /* Initial cursor flag */
+
+             for (let i             = 0; i < fieldCount; i++) {
+                 const handle       = SLOT_POOL[i];
+                 const layoutOffset = layoutBase + (i * layout_struct);
+                 const stateOffset  = stateBase + (i * state_struct);
+
+                 // Layout
+                 const layoutId  = view.getUint8(layoutOffset + 0);
+                 const typ       = view.getUint8(layoutOffset + 1);
+                 const col       = view.getUint8(layoutOffset + 2);
+                 const row       = view.getUint8(layoutOffset + 3);
+                 const width     = view.getUint8(layoutOffset + 4);
+                 const layout_r1 = view.getUint8(layoutOffset + 5);
+                 const layout_r2 = view.getUint8(layoutOffset + 6);
+                 const layout_r3 = view.getUint8(layoutOffset + 7);
+
+                 // State
+                 const stateId   = view.getUint8(stateOffset + 0);
+                 const flags     = view.getUint8(stateOffset + 1);
+                 const fgColor   = view.getUint8(stateOffset + 2);
+                 const bgColor   = view.getUint8(stateOffset + 3);
+                 const textLen   = view.getUint8(stateOffset + 4);
+                 const stateR1   = view.getUint8(stateOffset + 5);
+                 const stateR2   = view.getUint8(stateOffset + 6);
+                 const stateR3   = view.getUint8(stateOffset + 7);
+                 const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
+
+                 handle.layout.id = layoutId;
+                 handle.layout.typ = typ;
+                 handle.layout.col = col;
+                 handle.layout.row = row + VIEWPORT_TOP_ROWS; // ANDROID CUSTOMIZATION  
+                 handle.layout.width = width;
+                 
+                 handle.state.id = stateId;
+                 handle.state.flags = flags
+                 handle.state.fgColor = fgColor;
+                 handle.state.bgColor = bgColor;
+                 handle.state.len = textLen;
+                 handle.state.r1 = stateR1;
+                 
+
+                 // NOTE sending the id will only work when we have limited types for now.
+                 if (handle.state.r1 & FLAGS_H.CLICKABLE) {
+                     
+                     handle.onclick = clickable;
+                     console.log("CLICKABLE");
+                 } else {
+                     handle.onclick = null;
+                 }
+                     
+                 if (handle.state.flags & DSP.PASSWORD) { handle.type = "password"};                 
+		         handle.value = decoder.decode(textBytes);
+	             handle.disabled = false;
+                 handle.style.setProperty('--row', handle.layout.row);
+                 handle.style.setProperty('--col', handle.layout.col); //column not color
+                 handle.style.setProperty('--width', handle.layout.width);
+                 handle.maxLength = handle.layout.width; // Maximum number of chars a user can type.
+         
+                 handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); //
+                 handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
+                 handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
+                 handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
+                 handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
+
+                 handle.setAttribute('data-fg', handle.state.fgColor);
+                 handle.setAttribute('data-bg', handle.state.bgColor);
+
+                 if (handle.state.flags & DSP.INVERSE) {
+                     handle.state.inverse = true;
+                     handle.setAttribute('data-fg', (handle.state.bgColor || defColorsGlobal.bg));
+                     handle.setAttribute('data-bg', (handle.state.fgColor || defColorsGlobal.fg));
+                 } else {
+                     if (handle.state.inverse) {
+                         handle.state.inverse = false;
+                         handle.setAttribute('data-fg', (handle.state.fgColor || defColorsGlobal.fg));
+                         handle.setAttribute('data-bg', (handle.state.bgColor || defColorsGlobal.bg));
+                     }
+                 }
+                 
+                 switch (handle.layout.typ) {
+                     case TYP.LABEL:
+                         { 
+                             handle.readOnly = true;
+                             handle.classList.add('label');
+                         } break;
+                     case TYP.INPUT:
+                         {
+                             handle.readOnly = false;
+		                     handle.tabIndex = 0;
+		                     handle.oninput = set_dirty;
+                             INPUTS.push(handle);
+                         } break;
+                     case TYP.HLINE:
+                         {
+                             handle.readOnly = true;
+                             handle.classList.add('hline');
+                             handle.value    = ''; 
+                             handle.tabIndex = -1; 
+                         } break;
+                 }
+                 
+             /* TODO: this should be encoded in flags set with ic */
+             SLOT_POOL[reserved].focus();
+             }
+         }
+         function sys_net_init(url) {
+	         const socket = new WebSocket(url);
+	         socket.binaryType = "arraybuffer";  
+	         socket.onmessage = function(event) {
+                 if(event.data.byteLength > 0) {
+                     const view = new DataView(event.data);
+                     const opcodeA = view.getUint8(0);
+                     if(opcodeA === OPCODE_A.NEW) {
+                         globalReset();
+                         sys_render_terminal(view);
+                     } else {
+                         sys_update_terminal(view);
+                     }
+                 } 
+	         };
+             
+	         socket.onopen = ()  =>
+	             {
+		             console.log  ("Network pipeline connected to C backend.");
+		             socket.send(Uint8Array.of(0x89)); // ANDROID NOTE: -> MOBILE Customer Is 0x89 web is 0x88
+	             }
+             
+	         socket.onerror = (err) => console.error("Network socket error:", err);
+	         socket.onclose = ()    => console.log  ("Network pipeline disconnected.");
+	         return socket;
+         }
+        </script>
+    </body>
+</html>
+
+<!-- <-- -->
+<!--     function sys_on_packet_received(arrayBuffer) { -->
+<!--         const view = new DataView(arrayBuffer); -->
+
+<!--         // Read the very first byte to determine the type of payload -->
+<!--         const msgType = view.getUint8(0);  -->
+
+<!--         switch (msgType) { -->
+<!--         case 1: // Terminal Screen Data -->
+<!--             sys_render_terminal(arrayBuffer); -->
+<!--             break; -->
+
+<!--         case 2: // Media Asset Data -->
+<!--             sys_process_media(arrayBuffer); -->
+<!--             break; -->
+
+<!--         default: -->
+<!--             console.error("Unknown message type identifier:", msgType); -->
+<!--         } -->
+<!--     } -->
+
+
+<!-- Enter	0x7D	Commit block mutations -->
+<!-- F1	0xF1	Request Help / Custom action -->
+<!-- F2	0xF2	Custom action -->
+<!-- F3	0xF3	Exit / Back -->
+<!-- ...	...	... -->
+<!--     F12	0xFC	Custom action -->
+<!-- -\-> -->
+
+
+<!-- IBM terminology:
+
+     MDT → Modified Data Tag
+     IC → Initial Cursor
+     PROT → Protected
+     NUM → Numeric-only
+     AID → Attention Identifier (Enter/PF keys -->

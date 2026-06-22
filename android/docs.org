@@ -1,0 +1,6 @@
+* to compile/assmeble android
+./gradlew assembleDebug 
+
+* To load to phone
+/home/alpha/projects/macabee/android/app/build/outputs/apk/debug
+adb install -r app-debug.apk 
