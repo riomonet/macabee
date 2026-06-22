@@ -42,7 +42,7 @@ struct __attribute__((packed)) field_layout {
     u8 x;
     u8 y;
     u8 width;
-    u8 r1;
+    u8 height;
     u8 r2;
     u8 r3;
 };
@@ -54,7 +54,7 @@ struct __attribute__((packed)) field_state {
     u8 fg_color;
     u8 bg_color;
     u8 text_len;
-    u8 r1;
+    u8 flags_h; 
     u8 r2;
     u8 r3;
     char text[MAX_FLD_SIZE];
@@ -87,6 +87,10 @@ enum DSP {
     HIDDEN    = 1 << 5,
     H_LINE    = 1 << 6,
     PASSWORD  = 1 << 7
+};
+
+enum FLAGS_H {
+    CLICKABLE = 1 << 0,
 };
 
 

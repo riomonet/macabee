@@ -26,8 +26,8 @@ enum ROLES {
     ROLE_ALPHA = 1,
     ROLE_OFFICE = 2,
     ROLE_YARD = 3,
-    ROLE_ACCOUNTING = 4
-};
+    ROLE_ACCOUNTING = 4,
+  };
 
 /* ============================================================================
        BIG FUCKING BUSINESS HERE
@@ -35,28 +35,33 @@ enum ROLES {
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
 
-#define LABEL(id, xx, yy, ww, txt)				\
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0)
 
-#define INPUT(id, xx, yy, ww)			\
-    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0)
 
-#define INPUT_F(id, xx, yy, ww,flg)		\
-    X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0)
+#define LABEL(id, yy, xx, ww, txt)                                  \
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0, 0, 0, 0)
 
-#define HL(id, xx, yy, ww)                      \
-    X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0)
+#define INPUT(id, yy, xx, ww)                   \
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, 0,0,0)
 
-#define LABEL_F(id, xx, yy, ww, txt, flg)                       \
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0)
+#define INPUT_F(id, yy, xx, ww,flg)		\
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
 
-#define LABEL_C(id, xx, yy, ww, txt, col)			\
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col)
+#define HL(id, yy, xx, ww)                      \
+    X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0, 0,0,0)
 
-#define LABEL_CF(id, xx, yy, ww, txt, flg, col)			\
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col)
+#define LABEL_F(id, yy, xx, ww, txt, flg)                       \
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0, 0,0,0)
 
-#define STATUS(id, xx, yy, ww, txt, flg)	\
+#define LABEL_C(id, yy, xx, ww, txt, col)			\
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col, 0,0,0)
+
+#define LABEL_FC(id, yy, xx, ww, txt, flg, col)			\
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, 0,0,0)
+
+#define LABEL_FCF(id, yy, xx, ww, txt, flg, col)			\
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, CLICKABLE ,0,0)
+
+#define STATUS(id, yy, xx, ww, txt, flg)	\
     LABEL_F(id, xx, yy, ww, txt, flg)
 
 #define STATE(id, txt, flg, col)		\
@@ -74,7 +79,7 @@ enum ROLES {
             .op_B = (opB),                                  \
             .layout = (layout_arr),                         \
             .state = (state_arr),                           \
-	    .nFields = cnt,				    \
+    .nFields = cnt,                                         \
             .ic = (cursor_pos)                              \
     }
 
@@ -84,60 +89,75 @@ enum ROLES {
 #define SCREENS_LIST						\
     YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)		\
     YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)		\
+    YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
 
 
 /* SCREEN STUBS */
 #define SCREEN_STUB_HEADER(SCR,title)					\
-    LABEL(SCR##_FLD_USER,7,1,32, "")					\
-    LABEL(SCR##_FLD_DATE,67,1,32, "")					\
-    LABEL(SCR##_FLD_TIME,67,2,12, "")					\
-    LABEL(SCR##_FLD_TITLE,29,1,21, title)				\
-    LABEL_CF(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
+    LABEL(SCR##_FLD_USER,1,7,32, "")					\
+    LABEL(SCR##_FLD_DATE,1,67,32, "")                     \
+    LABEL(SCR##_FLD_TIME,2,67,12, "")                   \
+    LABEL(SCR##_FLD_TITLE,1,29,21, title)                               \
+    LABEL_FC(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
 #define SCREEN_STUB_FOOTER(SCR)				\
-    LABEL(SCR##FLD_SELECTION,1,23,9,"Selection")	\
-    LABEL(SCR##FLD_ARROW,1,24,4, "-->")		\
-    HL(SCR##_FLD_HL1,1,26,100)			\
-    LABEL(SCR##_FLD_F1,6,28,9,"")			\
-    LABEL(SCR##_FLD_F2,19,28,9, "")			\
-    LABEL(SCR##_FLD_F3,31,28,16,"")			\
-    HL(SCR##_FLD_HL2,0,29,100)			\
-    HL(SCR##_FLD_HL3,7,24,90)			\
-    INPUT(SCR##_ISELECT,6,24,1)                              
+    LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")	\
+    LABEL(SCR##FLD_ARROW,24,1,4, "-->")             \
+    HL(SCR##_FLD_HL1,26,1,100)                      \
+    LABEL(SCR##_FLD_F1,28,6,9,"")                   \
+    LABEL(SCR##_FLD_F2,28,19,9, "")                 \
+    LABEL(SCR##_FLD_F3,28,31,16,"")                 \
+    HL(SCR##_FLD_HL2,29,0,100)                      \
+    HL(SCR##_FLD_HL3,24,7,90)                        \
+    INPUT(SCR##_ISELECT,24,6,1)                              
 
 /* LOGIN SCREEN col, row */
 #define LOGIN_SCREEN                                                    \
-    LABEL(LOGIN_L1       , 9,   8, 27,     "USER . . . . . . . . . . . ") \
-    LABEL(LOGIN_L2       , 9,  10, 27, "PASSWORD . . . . . . . . . ")     \
-    INPUT(LOGIN_IUSER    , 38,  8, 24)                                    \
-    INPUT_F(LOGIN_IPW    , 38, 10, 24,  PASSWORD)                         \
-    LABEL_CF(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT,CYAN) \
-    LABEL_C(LOGIN_L4     , 40,  1, 19, "Marina 59 | Sign On", WHITE)    \
-    STATUS(LOGIN_WARNING , 38, 12, 42, "", HIDDEN)                      
+    LABEL(LOGIN_L1       , 8,   9, 27,     "USER . . . . . . . . . . . ") \
+    LABEL(LOGIN_L2       , 10,   9, 27, "PASSWORD . . . . . . . . . ")     \
+    INPUT(LOGIN_IUSER    , 8,  38, 24)                                    \
+    INPUT_F(LOGIN_IPW    , 10, 38, 24,  PASSWORD)                         \
+    LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
+    LABEL_C(LOGIN_L4     , 1,  40, 19, "Marina 59 | Sign On", WHITE)    \
+    STATUS(LOGIN_WARNING , 12, 38, 42, "", HIDDEN)                      
 
 /*   id, col, row, width */
 /* #define MAIN_SCREEN                                             \ */
 
 #define MAIN_SCREEN \
-    SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )	    \
-        LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \
-        LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \
+    SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )   \
+        LABEL(MAIN_L7,8,10,15,   "1. Contacts")             \
+        LABEL(MAIN_L8,9,10,17,   "2. Contracts")           \
     LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
-    LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
+    LABEL(MAIN_L10,11,10,15,  "4. Live montior")                \
     SCREEN_STUB_FOOTER(MAIN)
 
 #define MAIN_SCREEN_ALPHA			\
     SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )	    \
-        LABEL(MAIN_L7,10,8,15,   "1. Contacts")             \
-        LABEL(MAIN_L8,10,9,17,   "2. Contracts")           \
+    LABEL(MAIN_L7,8,10,15,   "1. Contacts")                 \
+        LABEL(MAIN_L8,9,10,17,   "2. Contracts")           \
     LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
-    LABEL(MAIN_L10,10,11,15,  "4. Live montior")                \
+    LABEL(MAIN_L10,11,10,15,  "4. Live montior")                \
     SCREEN_STUB_FOOTER(MAIN)
 
+/* MOBILE SCREENS (1,1) -> (59,45) */
+#define M_ACT_SCREEN                                                    \
+    LABEL_F(M_ACT_INST_TIT,    5, 6 ,13 , "Instructions:", BOLD)             \
+    LABEL_FC(M_ACT_INST_L1,     7, 6 ,33 , "We sent you an activation code in",FAINT, CYAN) \
+    LABEL_FC(M_ACT_INST_L2,     8, 6 ,31 , "a text message. Please enter it", FAINT, CYAN) \
+    LABEL_FC(M_ACT_INST_L3,     9, 6 ,37 , "after the prompt then press activate.",FAINT,CYAN) \
+    LABEL_F(M_ACT_TITLE,     13, 6 ,9 , "Marina 59", BOLD)                   \
+    LABEL(M_ACT_MSG,       15, 6, 22, "Enter Activation Code:")         \
+    INPUT(M_ACT_CODE,      15, 30, 9 )                                  \
+    LABEL_FCF(M_ACT_ENTER,  19, 6, 12, " [ACTIVATE] ", BOLD | INVERSE, GREEN)
 
-/* -------------------------------------------- END SCREEN DEFINTIONS --------------------------------------------- */
+//(1,5) - (45,59)
+// 45 wide y range is 5-59 x range is 1-45
 
-#define X(id, t, x, y, w, txt, len, flg, col) id,
+
+/* -------------------------------------------- END SCREEN DEFIvNTIONS --------------------------------------------- */
+
+#define X(id, t, x, y, w, txt, len, flg, col,r1,r2,r3) id,
 #define YMB(SCR,scr, IC) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
 SCREENS_LIST
 #undef X
@@ -145,16 +165,16 @@ SCREENS_LIST
 
 
 #define YMB(SCR,scr,IC) struct field_layout scr##_layout[] = {SCR};   
-#define X(id, t, xx, yy, w, txt, len, flg, col)                         \
-    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w) },
+#define X(id, t, xx, yy, w, txt, len, flg, col, ht, rr2, rr3)                 \
+    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w), .height = (ht), .r2= (rr2), .r3 = (rr3) },
 SCREENS_LIST
 #undef X
 #undef YMB
 
 #define YMB(SCR,scr,IC) struct field_state scr##_state[] = {SCR};
-#define X(id, t, x, y, w, txt, len, flg, col)               \
+#define X(id, t, x, y, w, txt, len, flg, col, flg_h, rr2, rr3)        \
     { .field_id = (id), .text = (txt), .text_len = (len),   \
-            .fg_color = (col), .flags = (flg) },
+    .fg_color = (col), .flags = (flg), .flags_h = (flg_h), .r2 = (rr2), .r3 = (rr3) },
 SCREENS_LIST
 #undef X
 #undef YMB
@@ -294,14 +314,12 @@ void mb_send (struct player *player) {
 
     mg_ws_send(player->c, payload.buf, payload.len, WEBSOCKET_OP_BINARY);
 }
-     
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
 
 void set_field_text(struct screen *scr, int field, char *value) {
     strcpy(scr->state[field].text, value);
 }
-
 
 void render_login_warning(struct player *player, char *txt) {
 
@@ -337,7 +355,6 @@ void render_login_warning(struct player *player, char *txt) {
 #define x20 " "
 #define COMMA ","
 
-
 /* column constraints */
 #define PK x20 "PRIMARY KEY"
 #define NN x20 "NOT NULL"
@@ -348,6 +365,7 @@ void render_login_warning(struct player *player, char *txt) {
 #define NAME_T 25
 #define EMAIL_T 128
 #define PHONE_T 17 //phone
+#define BLOB_T 512
 #define PW_HASH_T crypto_pwhash_STRBYTES
 
 typedef char name_t  [NAME_T]; 
@@ -355,19 +373,13 @@ typedef char email_t [EMAIL_T];
 typedef char phone_t  [PHONE_T];
 typedef char pw_t[PW_HASH_T];
 
-
 /* TABLE INDEX */
 #define DB_TABLES                               \
-    X(usr,   USR_SCHEMA)                        \
-    X(sys_state,  SYS_STATE_SCHEMA)		\
-    X(pw,  PW_SCHEMA)		
-
+    X(usr, USR_SCHEMA)                          \
+    X(pw,  PW_SCHEMA)                           \
+    X(dev, DEV_SCHEMA)
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
-#define SYS_STATE_SCHEMA                                    \
-    TCV(sys_state_col,  admin_uid, u16, INTEGER, DF(1))     \
-    TCV(sys_state_col,  boat_id,   u16, INTEGER, DF(100))	\
-    TCVL(sys_state_col, cust_uid,  u16, INTEGER, DF(100))	
 
 #define PW_SCHEMA                               \
     TCV(PW_C,  uid,  u16,  INTEGER, NN UQ)      \
@@ -382,7 +394,11 @@ typedef char pw_t[PW_HASH_T];
     TCV(USR_C,  first, name_t, TEXT)            \
     TCVL(USR_C, last, name_t, TEXT)			
 
-
+#define DEV_SCHEMA                                                      \
+    TCV(DEV_C,  did, u16, INTEGER, PK)                                  \
+    TCV(DEV_C,  uid, u16, INTEGER, NN)                                  \
+    TCV(DEV_C,  active, u8, INTEGER, DF(0) NN)                          \
+    TCVL(DEV_C, type, u8, INTEGER, DF(0))  //0 for mobile phone 1 for farpointe clicker
     /* NOTE:(ari) Add phone as text in e.164 format  */
 
 /* Schema derived db tables. */
@@ -616,7 +632,6 @@ struct all_users {
     struct usr_rec rec[4096];
 };
 
-
 int read_usr_all(sqlite3 *db,struct all_users *usr ) {
 
     if(!getall_usr_stmt) {
@@ -668,6 +683,39 @@ int update_usr(sqlite3 *db, struct usr_rec *usr) {
 
 /* DELETE FROM users */
 /* WHERE uid = ? */
+
+/* int create_dev(sqlite3 *db, struct usr_rec *usr) { */
+/*        if(!insert_dev_stmt) { */
+/*         insert_dev_stmt = create_statement(db, */
+/*                                            "INSERT INTO dev" */
+/*                                            "(uid, credential, pubkey, type)" */
+/*                                            "VALUES (?, ?, ?, ?)" */
+/*                                            ); */
+/*     } */
+    
+/*     sqlite3_stmt *stmt = insert_usr_stmt; */
+/*     sqlite3_bind_int(stmt,  1, dev->uid); */
+/*     sqlite3_bind_blob(stmt, 2, dev->credential); */
+/*     sqlite3_bind_blob(stmt, 3, usr->pubkey, -1, SQLITE_STATIC); */
+/*     sqlite3_bind_text(stmt, 4, usr->email, -1, SQLITE_STATIC); */
+/*     sqlite3_bind_text(stmt, 5, usr->phone, -1, SQLITE_STATIC); */
+/*     sqlite3_bind_text(stmt, 6, usr->first, -1, SQLITE_STATIC); */
+/*     sqlite3_bind_text(stmt, 7, usr->last,  -1, SQLITE_STATIC); */
+
+/*     int INSERT_OK = sqlite3_step(stmt); */
+/*     if (INSERT_OK != SQLITE_DONE) { */
+/*         fprintf(stderr, "[create_usr] %s\n", sqlite3_errmsg(db)); */
+/*         return 0; */
+/*     } */
+/*     sqlite3_reset(stmt); */
+/*     sqlite3_clear_bindings(stmt); */
+/*     return 1;     */
+/* } */
+/* int get_all_dev() {} */
+/* int read_dev_all() {} */
+/* int update_dev() {} */
+/* int delete_dev() {} */
+
 
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
@@ -928,6 +976,14 @@ void goto_main_screen(struct player *player) {
     mb_send(player);    
 }
 
+void goto_m_activate_screen(struct player *player) {
+    set_live_screen(player, IN_M_ACT_SCREEN);
+    mb_send(player);
+}
+
+
+
+
 /* On  update just send the correct opcdoe and thee  */
 void mb_update(struct player *player, int nFields, int IC, struct field_state *update) {
 
@@ -965,6 +1021,18 @@ void goto_login_screen(struct player *player) {
     set_live_screen(player, IN_LOGIN_SCREEN);
     mb_send(player);    
 }
+
+
+
+int try_activate(struct player *player,u8 *reqbuf) {
+    (void) player;
+    struct cfh *header = (struct cfh *)reqbuf;
+    if(header->AID == M_ACT_ENTER) {
+        printf("have recieved an enter");
+    }
+    return 1;
+}
+
 
 int try_login(struct player *player, u8 *reqbuf) {
 
@@ -1024,18 +1092,29 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
 
     (void) reqbuflen;
 
+
     struct player *player = NULL;
-    HASH_FIND_PTR(players,&c, player);
+    HASH_FIND_PTR(players, &c, player);
 
     /* Player is not yet added to the world.  Add player to the world and send initial login screen. */
-    if (!player) { 
+    
+    if (!player) {
         player = onboard_new_player(c);
-	goto_login_screen(player);
+        if(reqbuf[0] == 0x88) {
+            goto_login_screen(player);
+        }
+        else if (reqbuf[0] == 0x89) {
+            goto_m_activate_screen(player);
+        }
 
     } 	/* Player is in the world.  The cases are responses to MAIN_SCREEN_ID*/ else {
-        switch(player->scrid) { 
-
-	case IN_LOGIN_SCREEN:         
+        
+        switch(player->scrid) {
+        case IN_M_ACT_SCREEN:
+            {
+                goto_m_activate_screen(player);
+            } break;
+        case IN_LOGIN_SCREEN:         
             {
 		if (try_login(player,reqbuf)) {
 		    switch (player->auth.role) {
@@ -1051,7 +1130,7 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
 		//get_AID_KEY();
 		goto_main_screen(player);
 	    } break;
-	}
+        }
     }
 }
 
@@ -1238,7 +1317,6 @@ void root_menu(sqlite3 *db) {
     }
 }
 
-
 /* Root password required for startup */
 void require_root(sqlite3 *db) {
     
@@ -1308,25 +1386,24 @@ int main(void) {
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
 
-    time_t last_tick = time(NULL);
+    //    time_t last_tick = time(NULL);
     
     for(;;) {
     	mg_mgr_poll(&mgr,1000);
 
-        time_t now = time(NULL);
+        /* time_t now = time(NULL); */
         
-        if (now != last_tick) {
-            last_tick = now;
-            //tick(now);
-            char time[32];
-            time_now(time, 32);
-            tick(time);
-        }
+        /* if (now != last_tick) { */
+        /*     last_tick = now; */
+        /*     //tick(now); */
+        /*     char time[32]; */
+        /*     time_now(time, 32); */
+        /*     tick(time); */
+        /* } */
     }
     return 0;
     sqlite3_close(db);
 }
-
 
 //visual spec
 //state patch
@@ -1354,7 +1431,7 @@ int main(void) {
 
   ------------------------------------------------------------------------------------------------------------------------------ */
 /*
-  
+
   struct __attribute__((packed))
   Opcode 1
   type of data, labales and inputs, images, multimedia
@@ -1362,7 +1439,7 @@ int main(void) {
   <video> audio/video media
   <img> image container
   <canvas> container
-  
+
  */
 /* ------------------------------------big fucking business is the barrier between netowrking and business, dispatch */
 // need to start tracking client state by token or fd now and here.
@@ -1382,9 +1459,7 @@ int main(void) {
 
 update screen 
 
-
 |opcodeA|opcodeB|numfield|stateBytes|
-
 
  */
 /* #define MAIN_MENU_FIELDS \ */
@@ -1416,6 +1491,6 @@ update screen
 /* MESSAGE FORMATS */
 
 /* ------------------ CLIENT to SERVER MESSAGE FORMAT   ---------------------------
-         Header:           | opcode u8  |  aidkey u8   | nFields u8    |
-         Field blocks:     | field_id  u8 |  fldlen u8 | field_val u24 |
+         Header:           |   opcode u8  |  aidkey u8   | nFields u8    |
+         Field blocks:     | field_id  u8 |  fldlen u8   | field_val 24 |
 ---------------------------------------------------------------------------------- */
