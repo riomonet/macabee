@@ -3,9 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-
-#include <sodium.h>
-//#include "libsodium-stable/build/include/sodium.h"
+#include "libsodium-stable/build/include/sodium.h"
 #include <assert.h>
 #include <stdio.h>
 #include <termios.h>
