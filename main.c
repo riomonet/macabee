@@ -16,6 +16,10 @@
 #include "uthash.h"
 
 
+#define DEV_MODE 0
+#define DB_RESET 0
+
+
 #define UID_NF UINT16_MAX // UID NOT FOUND. [SENTINEL]
 
 sqlite3 *db;
@@ -772,8 +776,7 @@ int update_usr(sqlite3 *db, struct usr_rec *usr) {
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
 
-#define DEV_MODE 0
-#define DB_RESET 0
+
 void create_tables(sqlite3 *db) {
     for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
         if(db_schema[i].creat){
@@ -1417,14 +1420,17 @@ void require_root(sqlite3 *db) {
     return;
 }
 
+
+
 int main(void) {
 
     db = init_db();
     create_tables(db);
-
-    #ifndef DEV_MODE
+    
+#if DEV_MODE == 0
+    printf("DEV_MODE NOT");
     require_root(db);
-    #endif
+#endif
             
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
