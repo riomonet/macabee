@@ -4,8 +4,8 @@
 #include <string.h>
 #include <stdbool.h>
 
-//#include <sodium.h>
-#include "libsodium-stable/build/include/sodium.h"
+#include <sodium.h>
+//#include "libsodium-stable/build/include/sodium.h"
 #include <assert.h>
 #include <stdio.h>
 #include <termios.h>
@@ -596,8 +596,8 @@ int next_uid(sqlite3 *db,int typ) {
                                                   " from usr "
                                                   "where uid > 999 and uid < 30000"
                                                   );
-    sqlite3_stmt *stmt;
-    int uid;
+    sqlite3_stmt *stmt = NULL;
+    int uid = UID_NF;
     switch (typ) {
     case  ADMIN_UID_T:
         stmt = next_uid_admin_stmt;
@@ -774,18 +774,18 @@ int update_usr(sqlite3 *db, struct usr_rec *usr) {
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
 
-#define DEV_MODE 1
+#define DEV_MODE 0
 #define DB_RESET 0
 void create_tables(sqlite3 *db) {
     for(size_t i = 0; i < MAX_SLOTS(db_schema); i++ ) {
-	if(db_schema[i].creat){
-	    if(DB_RESET) {
-		sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL);
-		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
-	    } else {
-		sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
-	    }
-	}
+        if(db_schema[i].creat){
+            if(DB_RESET) {
+                sqlite3_exec(db, db_schema[i].drop  ,NULL, NULL, NULL);
+                sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+            } else {
+                sqlite3_exec(db, db_schema[i].creat ,NULL, NULL, NULL);
+            }
+        }
     }
 }
 

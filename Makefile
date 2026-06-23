@@ -7,9 +7,10 @@
 # 	action						
 
 CC := gcc
-CFLAGS_RELEASE := -Wall -Wextra  -O2 -std=c11
-CFLAGS_DEBUG   := -Wall -Wextra  -O0 -g3 -std=c11
+CFLAGS_RELEASE := -D_GNU_SOURCE -Wall -Wextra  -O2 -std=c11
+CFLAGS_DEBUG   := -D_GNU_SOURCE -Wall -Wextra  -O0 -g3 -std=c11
 
+LIBSODIUM_TAR := libsodium-1.0.22.tar.gz
 LIBSODIUM_DIR := libsodium-stable
 LIBSODIUM_CONFIGURE := ./configure \
       --enable-static \
@@ -29,9 +30,12 @@ macabee-debug: mongoose.o sqlite3.o main.o $(LIBSODIUM_DIR)/build/lib/libsodium.
 	$(CC) -o $@ $^ -I$(LIBSODIUM_DIR)/build/include
 
 
-$(LIBSODIUM_DIR)/build/lib/libsodium.a:
+$(LIBSODIUM_DIR):
+	tar -xf $(LIBSODIUM_TAR)
+
+$(LIBSODIUM_DIR)/build/lib/libsodium.a: $(LIBSODIUM_DIR)
 	@echo "=== Building Libsodium ==="
-	cd $(LIBSODIUM_DIR) && $(LIBSODIUM_CONFIGURE) && make -j$(nproc) && make install
+	cd $(LIBSODIUM_DIR) && $(LIBSODIUM_CONFIGURE) && make -j$$(nproc) && make install
 
 mongoose.o: mongoose.c
 	$(CC) $(CFLAGS) -c $< -o $@
