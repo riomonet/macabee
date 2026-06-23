@@ -3,7 +3,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <sodium.h>
+
+//#include <sodium.h>
+#include "libsodium-stable/build/include/sodium.h"
 #include <assert.h>
 #include <stdio.h>
 #include <termios.h>
@@ -398,8 +400,10 @@ typedef char pw_t[PW_HASH_T];
     TCV(DEV_C,  did, u16, INTEGER, PK)                                  \
     TCV(DEV_C,  uid, u16, INTEGER, NN)                                  \
     TCV(DEV_C,  active, u8, INTEGER, DF(0) NN)                          \
+    TCV(DEV_C,  pubkey, u8,  INTEGER)                                   \
     TCVL(DEV_C, type, u8, INTEGER, DF(0))  //0 for mobile phone 1 for farpointe clicker
     /* NOTE:(ari) Add phone as text in e.164 format  */
+
 
 /* Schema derived db tables. */
 #define TCV(tbl,  name, ctype, type, ...) #name x20 #type  __VA_ARGS__ COMMA
@@ -455,6 +459,57 @@ DB_TABLES
 #undef X
 #undef TCV
 #undef TCVL
+
+#define TCV(tbl, name, ctype, type, ...) "?,"
+#define TCVL(tbl, name, ctype,type,  ...) "?"
+#define X(name, SCHEMA) \
+    const char name##_qmarks[] =  SCHEMA;
+DB_TABLES
+#undef X
+#undef TCV
+#undef TCVL
+
+#define TCV(tbl, name, ctype, type, ...) #name ","
+#define TCVL(tbl, name, ctype,type,  ...) #name
+#define X(name, SCHEMA) \
+    const char name##_insert_fields[] = SCHEMA;
+DB_TABLES
+#undef X
+#undef TCV
+#undef TCVL
+
+#define X(name, SCHEMA) \
+    sqlite3_stmt *create_##name##_stmt = NULL;
+
+DB_TABLES
+
+#undef X
+
+/* This prototye was needed here */
+sqlite3_stmt *create_statement(sqlite3 *db, char *q);
+
+
+
+/* #define TCV(tbl, name, ctype, type, ...) #name"," */
+/* #define TCVL(tbl, name, ctype,type,  ...) #name */
+/* #define X(name, SCHEMA)                                     \ */
+/*     void create_##name(sqlite3 *db, struct name##_rec * name) {  \ */
+/*     if(!create_##name##_stmt) {                      \ */
+/*                                                             \ */
+/*     char buf[512];                                          \ */
+/*     snprintf(buf,512,"INSERT INTO " #name "(%s) VALUES"     \ */
+/*     "(%s)", name##_insert_fields , name##_qmarks );         \ */
+/*                                                             \ */
+/*     create_##name##_stmt = create_statement(db,buf);        \ */
+/*                                                             \ */
+/*     }                                                       \ */
+/*     } */
+/* DB_TABLES */
+
+/* #undef X */
+/* #undef TCV */
+/* #undef TCVL */
+
 #undef x20
 #undef COMMA
 #undef PK
@@ -483,7 +538,7 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
 }
 
 /* PW crud */
-sqlite3_stmt *create_pw_stmt = NULL;
+//sqlite3_stmt *create_pw_stmt = NULL;
 sqlite3_stmt *read_pw_stmt = NULL;   //by uid
 
 int create_pw (sqlite3 *db, struct pw_rec *pw) {
@@ -495,7 +550,6 @@ int create_pw (sqlite3 *db, struct pw_rec *pw) {
 						);
     }
     sqlite3_stmt *stmt = create_pw_stmt;
-
 	
     sqlite3_bind_int(stmt,  1, pw->uid);
     sqlite3_bind_text(stmt, 2, pw->hash, -1, SQLITE_STATIC);
@@ -945,7 +999,6 @@ void today(char *buf, int len) {
     
     time_t now = time(NULL);
     struct tm *tm = localtime(&now);
-    
     strftime(buf, len, "%a %b %d, %Y", tm);
 
 }
@@ -980,9 +1033,6 @@ void goto_m_activate_screen(struct player *player) {
     set_live_screen(player, IN_M_ACT_SCREEN);
     mb_send(player);
 }
-
-
-
 
 /* On  update just send the correct opcdoe and thee  */
 void mb_update(struct player *player, int nFields, int IC, struct field_state *update) {
@@ -1032,7 +1082,6 @@ int try_activate(struct player *player,u8 *reqbuf) {
     }
     return 1;
 }
-
 
 int try_login(struct player *player, u8 *reqbuf) {
 
@@ -1089,15 +1138,12 @@ int try_login(struct player *player, u8 *reqbuf) {
 
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
-
     (void) reqbuflen;
-
 
     struct player *player = NULL;
     HASH_FIND_PTR(players, &c, player);
 
     /* Player is not yet added to the world.  Add player to the world and send initial login screen. */
-    
     if (!player) {
         player = onboard_new_player(c);
         if(reqbuf[0] == 0x88) {
