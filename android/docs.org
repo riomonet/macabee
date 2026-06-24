@@ -4,3 +4,7 @@
 * To load to phone
 /home/alpha/projects/macabee/android/app/build/outputs/apk/debug
 adb install -r app-debug.apk 
+
+* specify where the sdk
+create local.properties file in top level and add tghe line
+sdk.dir=/home/alpha/Android/Sdk
