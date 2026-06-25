@@ -40,7 +40,6 @@ enum ROLES {
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
 
 
-
 #define LABEL(id, yy, xx, ww, txt)                                  \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0, 0, 0, 0)
 
@@ -160,7 +159,6 @@ enum ROLES {
 
 
 /* -------------------------------------------- END SCREEN DEFIvNTIONS --------------------------------------------- */
-
 #define X(id, t, x, y, w, txt, len, flg, col,r1,r2,r3) id,
 #define YMB(SCR,scr, IC) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
 SCREENS_LIST
@@ -377,11 +375,22 @@ typedef char email_t [EMAIL_T];
 typedef char phone_t  [PHONE_T];
 typedef char pw_t[PW_HASH_T];
 
+#define BIND_TEXT(stmt, col_num, field)sqlite3_bind_text(stmt, col_num, field, -1, SQLITE_STATIC)
+#define BIND_INT(stmt, col_num, field) sqlite3_bind_int(stmt,  col_num, field)
+#define BIND_name_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
+#define BIND_email_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
+#define BIND_phone_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
+#define BIND_pw_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
+#define BIND_u8(stmt, col_num, field) BIND_INT(stmt, col_num, field)
+#define BIND_u16(stmt, col_num, field) BIND_INT(stmt, col_num, field)
+
+
 /* TABLE INDEX */
 #define DB_TABLES                               \
-    X(usr, USR_SCHEMA)                          \
-    X(pw,  PW_SCHEMA)                           \
-    X(dev, DEV_SCHEMA)
+    X(usr, USR_SCHEMA)                         
+    /* X(pw,  PW_SCHEMA)                           \ */
+
+    /* X(dev, DEV_SCHEMA) */
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 
@@ -490,27 +499,37 @@ DB_TABLES
 /* This prototye was needed here */
 sqlite3_stmt *create_statement(sqlite3 *db, char *q);
 
+#define TCV(tbl, name, ctype, type, ...) BIND_##ctype(stmt,tbl##_##name + 1,table->name);
+#define TCVL(tbl,name, ctype,type,  ...) BIND_##ctype(stmt,tbl##_##name + 1,table->name);
+#define X(name, SCHEMA)                                         \
+    int create_##name(sqlite3 *db, struct name##_rec *table) {   \
+                                                                \
+    if(!create_##name##_stmt) {                                 \
+                                                                \
+    char buf[512];                                              \
+                                                                \
+    snprintf(buf,512,"INSERT INTO " #name "(%s) VALUES"         \
+    "(%s)", name##_insert_fields , name##_qmarks );             \
+                                                                \
+    create_##name##_stmt = create_statement(db,buf);            \
+    }                                                           \
+    sqlite3_stmt *stmt = create_##name##_stmt;                  \
+                                                                \
+    SCHEMA                                                      \
+    int rc = sqlite3_step(stmt);                                \
+    if(rc != SQLITE_DONE) {                                     \
+    fprintf(stderr, "%s\n", sqlite3_errmsg(db));                \
+    }                                                           \
+    sqlite3_reset(stmt);                                        \
+    sqlite3_clear_bindings(stmt);                               \
+    return rc == SQLITE_DONE;                                   \
+    }
 
+DB_TABLES
 
-/* #define TCV(tbl, name, ctype, type, ...) #name"," */
-/* #define TCVL(tbl, name, ctype,type,  ...) #name */
-/* #define X(name, SCHEMA)                                     \ */
-/*     void create_##name(sqlite3 *db, struct name##_rec * name) {  \ */
-/*     if(!create_##name##_stmt) {                      \ */
-/*                                                             \ */
-/*     char buf[512];                                          \ */
-/*     snprintf(buf,512,"INSERT INTO " #name "(%s) VALUES"     \ */
-/*     "(%s)", name##_insert_fields , name##_qmarks );         \ */
-/*                                                             \ */
-/*     create_##name##_stmt = create_statement(db,buf);        \ */
-/*                                                             \ */
-/*     }                                                       \ */
-/*     } */
-/* DB_TABLES */
-
-/* #undef X */
-/* #undef TCV */
-/* #undef TCVL */
+#undef X
+#undef TCV
+#undef TCVL
 
 #undef x20
 #undef COMMA
@@ -558,8 +577,8 @@ int create_pw (sqlite3 *db, struct pw_rec *pw) {
 
     int INSERT_OK = sqlite3_step(stmt);
     if (INSERT_OK != SQLITE_DONE) {
-	fprintf(stderr, "%s\n", sqlite3_errmsg(db));
-	return 0;
+        fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+        return 0;
     }
     sqlite3_reset(stmt);
     sqlite3_clear_bindings(stmt);
