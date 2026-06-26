@@ -32,7 +32,7 @@ enum ROLES {
   };
 
 /* ============================================================================
-       BIG FUCKING BUSINESS HERE
+              SCREEN MACROS SYSTEM (DSL)
 =============================================================================== */
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
@@ -271,7 +271,7 @@ struct player {
         time_t logintim;
         u8 attempts;
         u8 role;
-        u16 uid;
+        u16 id;
         char uname[25];
         time_t locked_until;
     } auth;
@@ -292,7 +292,7 @@ struct player *onboard_new_player(struct mg_connection *c) {
     player->auth.attempts = 0;
     player->auth.role = 0;
     memset(player->auth.uname, 0, sizeof(player->auth.uname)); 
-    player->auth.uid = UID_NF;           
+    player->auth.id = UID_NF;           
     player->auth.locked_until = 0;
     HASH_ADD_PTR(players, c, player);
     return player;
@@ -342,7 +342,10 @@ void render_login_warning(struct player *player, char *txt) {
     mb_send(player);
 }
 
-/* =============================== DATABASE DSL ====================================== */
+
+/* ============================================================================
+              DATABASE TABLE AND CRUD MACROS GENERATION SYSTEM (TCGS)
+=============================================================================== */
 
 
 #define SQLITE_JOURNAL_MODE wal
@@ -391,12 +394,13 @@ typedef char pw_t[PW_HASH_T];
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 
-#define PW_SCHEMA                               \
-    TCV(PW_C,  uid,  u16,  INTEGER, NN UQ)      \
+/* pw.id == usr.id */
+#define PW_SCHEMA                                   \
+    TCV(PW_C,  id,  u16,  INTEGER, NN UQ)           \
     TCVL(PW_C, hash, pw_t, TEXT,    NN   )	
 
 #define USR_SCHEMA                              \
-    TCV(USR_C,  uid,   u16, INTEGER, NN UQ)		\
+    TCV(USR_C,  id,   u16, INTEGER, NN UQ)		\
     TCV(USR_C,  uname, name_t, TEXT, NN UQ)     \
     TCV(USR_C,  role,  u8, INTEGER, NN)         \
     TCV(USR_C,  email, email_t, TEXT)           \
@@ -405,12 +409,10 @@ typedef char pw_t[PW_HASH_T];
     TCVL(USR_C, last, name_t, TEXT)			
 
 #define DEV_SCHEMA                                                      \
-    TCV(DEV_C,  did, u16, INTEGER, PK)                                  \
-    TCV(DEV_C,  uid, u16, INTEGER, NN)                                  \
+    TCV(DEV_C,  id, u16, INTEGER, PK)                                   \
     TCV(DEV_C,  active, u8, INTEGER, DF(0) NN)                          \
-    TCV(DEV_C,  pubkey, u8,  INTEGER)                                   \
     TCVL(DEV_C, type, u8, INTEGER, DF(0))  //0 for mobile phone 1 for farpointe clicker
-    /* NOTE:(ari) Add phone as text in e.164 format  */
+/* NOTE:(ari) Add phone as text in e.164 format  */
 
 
 /* Schema derived db tables. */
@@ -486,6 +488,18 @@ DB_TABLES
 #undef TCV
 #undef TCVL
 
+
+
+#define TCV(tbl, name, ctype, type, ...) #name"=?, "
+#define TCVL(tbl, name, ctype,type,  ...) #name"=?"
+#define X(name, SCHEMA) \
+    const char name##_update_fields[] = SCHEMA;
+DB_TABLES
+#undef X
+#undef TCV
+#undef TCVL
+
+
 #define X(name, SCHEMA) \
     sqlite3_stmt *create_##name##_stmt = NULL;
 
@@ -515,7 +529,7 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q);
     SCHEMA                                                      \
     int rc = sqlite3_step(stmt);                                \
     if(rc != SQLITE_DONE) {                                     \
-    fprintf(stderr, "%s\n", sqlite3_errmsg(db));                \
+    fprintf(stderr, "create_ %s\n", sqlite3_errmsg(db));        \
     }                                                           \
     sqlite3_reset(stmt);                                        \
     sqlite3_clear_bindings(stmt);                               \
@@ -587,6 +601,47 @@ DB_TABLES
 #undef TCV
 #undef TCVL
 
+
+#define X(name, SCHEMA) \
+    sqlite3_stmt *update_##name##_stmt = NULL;
+DB_TABLES
+#undef X
+
+
+#define TCV(tbl, name, ctype, type, ...) BIND_##ctype(stmt,tbl##_##name + 1,rec->name);
+#define TCVL(tbl,name, ctype,type,  ...) BIND_##ctype(stmt,tbl##_##name + 1,rec->name);
+#define X(name, SCHEMA)                                         \
+    int update_##name(sqlite3 *db, struct name##_rec *rec) {    \
+                                                                \
+    if(!update_##name##_stmt) {                                 \
+                                                                \
+    char buf[512];                                              \
+                                                                \
+    snprintf(buf,512,"UPDATE " #name " SET %s "                 \
+    "WHERE id = ?", name##_update_fields);                      \
+                                                                \
+    update_##name##_stmt = create_statement(db,buf);            \
+    }                                                           \
+    sqlite3_stmt *stmt = update_##name##_stmt;                  \
+                                                                \
+    SCHEMA                                                      \
+    sqlite3_bind_int(stmt, name##_cols_CNT +1, rec->id);        \
+    int rc = sqlite3_step(stmt);                                \
+    if(rc != SQLITE_DONE) {                                     \
+    fprintf(stderr, "update_ %s\n", sqlite3_errmsg(db));        \
+    }                                                           \
+    sqlite3_reset(stmt);                                        \
+    sqlite3_clear_bindings(stmt);                               \
+    return rc == SQLITE_DONE;                                   \
+    }
+ 
+DB_TABLES
+
+#undef X
+#undef TCV
+#undef TCVL
+
+
 #undef x20
 #undef COMMA
 #undef PK
@@ -599,9 +654,6 @@ DB_TABLES
 
 
 /* ---------------------------------  CRUD QUERIES    ------------------------------------------------------------ */
-// create statment
-// bind
-// fillout struct and step, or, step and fill out struct.
 
 #define SQLITE_READ_TO_NUL -1
 
@@ -609,45 +661,17 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
     sqlite3_stmt *stmt;
     int rc =  sqlite3_prepare_v2(db, q, SQLITE_READ_TO_NUL, &stmt,NULL);
     if(rc != SQLITE_OK) {
-        fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "CREATE_STATMENT ERROR: %s\n", sqlite3_errmsg(db));
         exit(1);
     }
     return stmt;
 }
 
-/* PW crud */
-//sqlite3_stmt *create_pw_stmt = NULL;
-sqlite3_stmt *read_pw_stmt = NULL;   //by uid
-
-#if 0
-int create_pw (sqlite3 *db, struct pw_rec *pw) {
-    if(!create_pw_stmt) {
-	create_pw_stmt = create_statement(db,
-						"INSERT INTO pw"
-						"(uid, hash)"
-						"VALUES (?, ?)"
-						);
-    }
-    sqlite3_stmt *stmt = create_pw_stmt;
-	
-    sqlite3_bind_int(stmt,  1, pw->uid);
-    sqlite3_bind_text(stmt, 2, pw->hash, -1, SQLITE_STATIC);
-
-    int INSERT_OK = sqlite3_step(stmt);
-    if (INSERT_OK != SQLITE_DONE) {
-        fprintf(stderr, "%s\n", sqlite3_errmsg(db));
-        return 0;
-    }
-    sqlite3_reset(stmt);
-    sqlite3_clear_bindings(stmt);
-    return 1;    
-}
-#endif
-
 /* ID RANGES */
 sqlite3_stmt *next_uid_admin_stmt; /* Admin range is 10 < uid <= 100 */
 sqlite3_stmt *next_uid_staff_stmt; /* Staff range is 100 < uid  <= 200  */
 sqlite3_stmt *next_uid_customer_stmt;  /* customre range is 1000 < uid < U16 max */
+sqlite3_stmt *read_pw_stmt = NULL;   //by id
 
 enum UID_T {
     ADMIN_UID_T, STAFF_UID_T, CUSTOMER_UID_T
@@ -657,44 +681,43 @@ enum UID_T {
  *        admin    9 < uid  20
  *        staff   99 < uid < 120
  *    customers  999 < uid < 30000    */
-
 int next_uid(sqlite3 *db,int typ) {
     if(!next_uid_admin_stmt)
-        next_uid_admin_stmt = create_statement(db,"select MAX(uid) "
+        next_uid_admin_stmt = create_statement(db,"select MAX(id) "
                                                " from usr "
-                                               "where uid > 9 and uid < 20"
+                                               "where id > 9 and id < 20"
                                                );
 
     if(!next_uid_staff_stmt)
-        next_uid_staff_stmt = create_statement(db,"select MAX(uid) "
+        next_uid_staff_stmt = create_statement(db,"select MAX(id) "
                                                " from usr "
-                                               "where uid > 99 and uid < 110"
+                                               "where id > 99 and id < 110"
                                                );
     if(!next_uid_customer_stmt)
-        next_uid_customer_stmt = create_statement(db,"select MAX(uid) "
+        next_uid_customer_stmt = create_statement(db,"select MAX(id) "
                                                   " from usr "
-                                                  "where uid > 999 and uid < 30000"
+                                                  "where id > 999 and id < 30000"
                                                   );
     sqlite3_stmt *stmt = NULL;
-    int uid = UID_NF;
+    int id = UID_NF;
     switch (typ) {
     case  ADMIN_UID_T:
         stmt = next_uid_admin_stmt;
-        uid = 10;
+        id = 10;
             break;
     case STAFF_UID_T:
         stmt = next_uid_staff_stmt;
-        uid = 100;
+        id = 100;
             break;
     case CUSTOMER_UID_T:
         stmt = next_uid_customer_stmt;
-        uid = 1000;
+        id = 1000;
         break;
     }
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-            uid = (sqlite3_column_int(stmt, 0) + 1);
+            id = (sqlite3_column_int(stmt, 0) + 1);
         }
     } else {
         fprintf(stderr,"sqlite3_step failed: %s", sqlite3_errmsg(db));
@@ -702,18 +725,18 @@ int next_uid(sqlite3 *db,int typ) {
     
     sqlite3_reset(stmt);
     sqlite3_clear_bindings(stmt);
-    return uid;
+    return id;
 }
 
 /* Search for uid and return the related hashed 'pw'. */
 int read_pw (sqlite3 *db, struct pw_rec *pw) {
     int found = 0;
     if(!read_pw_stmt) {
-        read_pw_stmt = create_statement(db, "select hash from pw where uid = ?");
+        read_pw_stmt = create_statement(db, "select hash from pw where id = ?");
     }
     
     sqlite3_stmt *stmt = read_pw_stmt;
-    sqlite3_bind_int(stmt,  1, pw->uid);
+    sqlite3_bind_int(stmt,  1, pw->id);
     
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *hash = (const char *)sqlite3_column_text(stmt, 0);
@@ -725,130 +748,6 @@ int read_pw (sqlite3 *db, struct pw_rec *pw) {
     sqlite3_clear_bindings(stmt);
     return found;
 }
-
-/* USR crud */
-sqlite3_stmt *insert_usr_stmt = NULL;
-sqlite3_stmt *delete_usr_stmt = NULL;
-sqlite3_stmt *update_usr_stmt = NULL;
-
-
-#if 0
-int create_usr(sqlite3 *db, struct usr_rec *usr) {
-    if(!insert_usr_stmt) {
-        insert_usr_stmt = create_statement(db,
-                                           "INSERT INTO usr"
-                                           "(uid, role, uname, email, phone, first, last)"
-                                           "VALUES (?, ?, ?, ?, ?, ?, ?)"
-                                           );
-    }
-    
-    sqlite3_stmt *stmt = insert_usr_stmt;
-    sqlite3_bind_int(stmt,  1, usr->uid);
-    sqlite3_bind_int(stmt,  2, usr->role);
-    sqlite3_bind_text(stmt, 3, usr->uname, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, usr->email, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, usr->phone, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 6, usr->first, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 7, usr->last,  -1, SQLITE_STATIC);
-
-    int INSERT_OK = sqlite3_step(stmt);
-    if (INSERT_OK != SQLITE_DONE) {
-        fprintf(stderr, "[create_usr] %s\n", sqlite3_errmsg(db));
-        return 0;
-    }
-    sqlite3_reset(stmt);
-    sqlite3_clear_bindings(stmt);
-    return 1;    
-}
-#endif
-
-#if 0
-int read_usr_all(sqlite3 *db,struct all_users *usr ) {
-
-    if(!getall_usr_stmt) {
-	getall_usr_stmt = create_statement(db, "select * from usr");
-    }
-    
-    sqlite3_stmt *stmt = getall_usr_stmt;
-
-    int i = 0;
-    while(sqlite3_step(stmt) == SQLITE_ROW) {
-	usr->rec[i].uid = sqlite3_column_int(stmt,USR_C_uid);
-    usr->rec[i].role = sqlite3_column_int(stmt,USR_C_role);
-    strcpy(usr->rec[i].uname, (const char*)sqlite3_column_text(stmt, USR_C_uname));
-	strcpy(usr->rec[i].email, (const char*)sqlite3_column_text(stmt, USR_C_email));
-	strcpy(usr->rec[i].phone, (const char*)sqlite3_column_text(stmt, USR_C_phone));
-	strcpy(usr->rec[i].first, (const char*)sqlite3_column_text(stmt, USR_C_first));
-	strcpy(usr->rec[i].last,  (const char*)sqlite3_column_text(stmt, USR_C_last));
-	i++;
-    }
-    usr->len = i;
-    
-    sqlite3_reset(stmt);
-    sqlite3_clear_bindings(stmt);
-    return 1;
-}
-
-#endif
-
-int update_usr(sqlite3 *db, struct usr_rec *usr) {
-    if(!update_usr_stmt) {
-	update_usr_stmt = create_statement(db,
-					   "UPDATE usr"
-					   "(uid, email, phone, first, last)"
-					   "VALUES (?, ?, ?, ?, ?)"
-					   );
-    }
-        sqlite3_stmt *stmt = insert_usr_stmt;
-	
-    sqlite3_bind_int(stmt,  1, usr->uid);
-    sqlite3_bind_text(stmt, 2, usr->email, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, usr->phone, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, usr->first, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, usr->last,  -1, SQLITE_STATIC);
-    
-    return 0;
-}
-
-/* UPDATE users */
-/* SET email = ?, phone = ? */
-/* WHERE uid = ? */
-
-/* DELETE FROM users */
-/* WHERE uid = ? */
-
-/* int create_dev(sqlite3 *db, struct usr_rec *usr) { */
-/*        if(!insert_dev_stmt) { */
-/*         insert_dev_stmt = create_statement(db, */
-/*                                            "INSERT INTO dev" */
-/*                                            "(uid, credential, pubkey, type)" */
-/*                                            "VALUES (?, ?, ?, ?)" */
-/*                                            ); */
-/*     } */
-    
-/*     sqlite3_stmt *stmt = insert_usr_stmt; */
-/*     sqlite3_bind_int(stmt,  1, dev->uid); */
-/*     sqlite3_bind_blob(stmt, 2, dev->credential); */
-/*     sqlite3_bind_blob(stmt, 3, usr->pubkey, -1, SQLITE_STATIC); */
-/*     sqlite3_bind_text(stmt, 4, usr->email, -1, SQLITE_STATIC); */
-/*     sqlite3_bind_text(stmt, 5, usr->phone, -1, SQLITE_STATIC); */
-/*     sqlite3_bind_text(stmt, 6, usr->first, -1, SQLITE_STATIC); */
-/*     sqlite3_bind_text(stmt, 7, usr->last,  -1, SQLITE_STATIC); */
-
-/*     int INSERT_OK = sqlite3_step(stmt); */
-/*     if (INSERT_OK != SQLITE_DONE) { */
-/*         fprintf(stderr, "[create_usr] %s\n", sqlite3_errmsg(db)); */
-/*         return 0; */
-/*     } */
-/*     sqlite3_reset(stmt); */
-/*     sqlite3_clear_bindings(stmt); */
-/*     return 1;     */
-/* } */
-/* int get_all_dev() {} */
-/* int read_dev_all() {} */
-/* int update_dev() {} */
-/* int delete_dev() {} */
-
 
 
 /* -------------------------------------INITIALIZATION----------------------------------------------------------   */
@@ -879,7 +778,7 @@ sqlite3 *init_db() {
 
 void pw_encrypt_and_add_to_db(sqlite3 *db, int uid, char *clr_pw) {
     struct pw_rec pw;
-    pw.uid = uid;
+    pw.id = uid;
     if (crypto_pwhash_str ((char*)pw.hash,
                            clr_pw, strlen(clr_pw),
                            crypto_pwhash_OPSLIMIT_INTERACTIVE,
@@ -895,7 +794,7 @@ void pw_encrypt_and_add_to_db(sqlite3 *db, int uid, char *clr_pw) {
  * on success and 0 on failure */
 int pw_check_from_db(sqlite3 *db, int uid, char *clr_pw) {
     struct pw_rec pw;
-    pw.uid = uid;
+    pw.id = uid;
     int res = read_pw(db, &pw);
     (void) res;
     int verified = crypto_pwhash_str_verify(pw.hash, clr_pw, strlen(clr_pw));
@@ -908,7 +807,7 @@ void view_users_test(sqlite3 *db) {
     read_usr_all(db, &all);
     for (int i = 0; i < all.len; i++) {
 	printf("%d %s %s %s %s\n",
-	       all.rec[i].uid,
+	       all.rec[i].id,
 	       all.rec[i].email,
 	       all.rec[i].phone,
 	       all.rec[i].first,
@@ -918,11 +817,7 @@ void view_users_test(sqlite3 *db) {
 
 /* ============================     END DB          ============================================= */
 
-/* -----------------------------  Business Rules    --------------------------------------------- */
-
-
-/* SANITIZE,NORMALIZE, VALIDATE*/
-/* NAME_T, EMAIL_T, PHONE_T */
+/* ============================== SANITIZE,NORMALIZE, VALIDATE ================================= */
 
 int snv_email(char *email, char *cln) {
 
@@ -1052,7 +947,7 @@ void print_login_attempt(struct login_attempt *login) {
 
 struct usr_rec new_usr_rec() {
     struct usr_rec usr = {
-        .uid = UID_NF,
+        .id = UID_NF,
         .role = ROLE_NONE
     };
     return usr;
@@ -1192,11 +1087,11 @@ int try_login(struct player *player, u8 *reqbuf) {
         }
     }
     
-    if (pw_check_from_db(db, usr.uid, password)) {
+    if (pw_check_from_db(db, usr.id, password)) {
         player->auth.logintim = time(NULL);
         player->auth.attempts = 0;
         player->auth.role = usr.role;
-        player->auth.uid = usr.uid;
+        player->auth.id = usr.id;
         strcpy(player->auth.uname, usr.uname);
         player->auth.locked_until = 0;
 	return 1;
@@ -1339,7 +1234,7 @@ void console_add_admin(sqlite3 *db) {
     char first[NAME_T]  = {0};
     char  last[NAME_T]  = {0};
 
-    usr.uid = next_uid(db, ADMIN_UID_T);                
+    usr.id = next_uid(db, ADMIN_UID_T);                
 
  EMAIL:
     prompt = "Email: ";
@@ -1404,11 +1299,11 @@ void console_add_admin(sqlite3 *db) {
     clear_screen();
     char add[8] = {0};
 
-    printf("%s %s %s %s uid:%d\n Add admin? (y/n): ",usr.first, usr.last,usr.phone,usr.email,usr.uid);
+    printf("%s %s %s %s uid:%d\n Add admin? (y/n): ",usr.first, usr.last,usr.phone,usr.email,usr.id);
     read_stdin_interactive(add,"", sizeof(add));
 
     if(add[0] == 'y') {
-        pw_encrypt_and_add_to_db(db, usr.uid, pass);
+        pw_encrypt_and_add_to_db(db, usr.id, pass);
         strcpy(usr.uname, "alpha");
         usr.role = ROLE_ALPHA;
         create_usr(db, &usr);
@@ -1445,7 +1340,7 @@ void root_menu(sqlite3 *db) {
 void require_root(sqlite3 *db) {
     
     clear_screen();
-    struct pw_rec pw = {.uid = 0, .hash = ""};
+    struct pw_rec pw = {.id = 0, .hash = ""};
     int found = read_pw(db, &pw);
     
     if (!found) {               /* root password NOT found get new root password.*/
