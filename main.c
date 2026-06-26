@@ -15,10 +15,8 @@
 #include "cJSON.h"
 #include "uthash.h"
 
-
 #define DEV_MODE 0
 #define DB_RESET 0
-
 
 #define UID_NF UINT16_MAX // UID NOT FOUND. [SENTINEL]
 
@@ -92,7 +90,7 @@ enum ROLES {
 #define SCREENS_LIST						\
     YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)		\
     YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)		\
-    YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
+    YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    
 
 
 /* SCREEN STUBS */
@@ -386,11 +384,10 @@ typedef char pw_t[PW_HASH_T];
 
 
 /* TABLE INDEX */
-#define DB_TABLES                               \
-    X(usr, USR_SCHEMA)                         
-    /* X(pw,  PW_SCHEMA)                           \ */
-
-    /* X(dev, DEV_SCHEMA) */
+#define DB_TABLES                              \
+    X(usr, USR_SCHEMA)                         \
+    X(pw,  PW_SCHEMA)                          \
+    X(dev, DEV_SCHEMA)
 
 /* COLUMN DEFINTIONS FOR ALL SCHEMA */
 
@@ -531,6 +528,65 @@ DB_TABLES
 #undef TCV
 #undef TCVL
 
+
+#define X(name, SCHEMA)                                                \
+    struct all_##name {                                                \
+    int len;                                                           \
+    struct name##_rec rec[4096];                                       \
+    };
+
+DB_TABLES
+#undef X
+
+
+#define X(name, SCHEMA) \
+    sqlite3_stmt *getall_##name##_stmt = NULL;
+DB_TABLES
+#undef X
+
+
+#define ACCESS_INT(stmt, col_num,field) table->rec[i].field = sqlite3_column_int(stmt,col_num);
+#define ACCESS_TEXT(stmt,col_num,field) strcpy(table->rec[i].field, (const char *)sqlite3_column_text(stmt,col_num));
+#define ACCESS_u8(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
+#define ACCESS_u16(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
+#define ACCESS_name_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num,field)
+#define ACCESS_email_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+#define ACCESS_phone_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+#define ACCESS_pw_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+
+
+#define TCV(tbl, name, ctype, type, ...) ACCESS_##ctype(stmt,tbl##_##name, name )
+#define TCVL(tbl,name, ctype,type,  ...) ACCESS_##ctype(stmt,tbl##_##name, name)
+#define X(name, SCHEMA)                                             \
+    int read_##name##_all(sqlite3 *db, struct all_##name *table) {  \
+                                                                    \
+    if(!getall_##name##_stmt) {                                     \
+                                                                    \
+    char buf[512];                                                  \
+                                                                    \
+    snprintf(buf,512,"SELECT * FROM " #name);                       \
+                                                                    \
+    getall_##name##_stmt = create_statement(db,buf);                \
+    }                                                               \
+    sqlite3_stmt *stmt = getall_##name##_stmt;                      \
+    int rc;                                                         \
+    int i = 0;                                                      \
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW) {                \
+    SCHEMA                                                          \
+    i++;                                                            \
+    }                                                               \
+    table->len = i;                                                 \
+    sqlite3_reset(stmt);                                            \
+    sqlite3_clear_bindings(stmt);                                   \
+    return rc == SQLITE_DONE;                                       \
+    }
+
+DB_TABLES
+
+#undef X
+#undef TCV
+#undef TCVL
+
 #undef x20
 #undef COMMA
 #undef PK
@@ -539,6 +595,7 @@ DB_TABLES
 #undef DF
 #undef TBC_FK
 #undef TBCL_FK
+
 
 
 /* ---------------------------------  CRUD QUERIES    ------------------------------------------------------------ */
@@ -562,6 +619,7 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
 //sqlite3_stmt *create_pw_stmt = NULL;
 sqlite3_stmt *read_pw_stmt = NULL;   //by uid
 
+#if 0
 int create_pw (sqlite3 *db, struct pw_rec *pw) {
     if(!create_pw_stmt) {
 	create_pw_stmt = create_statement(db,
@@ -584,7 +642,7 @@ int create_pw (sqlite3 *db, struct pw_rec *pw) {
     sqlite3_clear_bindings(stmt);
     return 1;    
 }
-
+#endif
 
 /* ID RANGES */
 sqlite3_stmt *next_uid_admin_stmt; /* Admin range is 10 < uid <= 100 */
@@ -672,8 +730,9 @@ int read_pw (sqlite3 *db, struct pw_rec *pw) {
 sqlite3_stmt *insert_usr_stmt = NULL;
 sqlite3_stmt *delete_usr_stmt = NULL;
 sqlite3_stmt *update_usr_stmt = NULL;
-sqlite3_stmt *getall_usr_stmt = NULL;
 
+
+#if 0
 int create_usr(sqlite3 *db, struct usr_rec *usr) {
     if(!insert_usr_stmt) {
         insert_usr_stmt = create_statement(db,
@@ -701,12 +760,9 @@ int create_usr(sqlite3 *db, struct usr_rec *usr) {
     sqlite3_clear_bindings(stmt);
     return 1;    
 }
+#endif
 
-struct all_users {
-    int len;
-    struct usr_rec rec[4096];
-};
-
+#if 0
 int read_usr_all(sqlite3 *db,struct all_users *usr ) {
 
     if(!getall_usr_stmt) {
@@ -732,6 +788,8 @@ int read_usr_all(sqlite3 *db,struct all_users *usr ) {
     sqlite3_clear_bindings(stmt);
     return 1;
 }
+
+#endif
 
 int update_usr(sqlite3 *db, struct usr_rec *usr) {
     if(!update_usr_stmt) {
@@ -845,7 +903,7 @@ int pw_check_from_db(sqlite3 *db, int uid, char *clr_pw) {
 }
 
 void view_users_test(sqlite3 *db) {
-    struct all_users all;
+    struct all_usr all;
     all.len = 0;
     read_usr_all(db, &all);
     for (int i = 0; i < all.len; i++) {
@@ -1112,7 +1170,7 @@ int try_login(struct player *player, u8 *reqbuf) {
     }
         
     struct login_attempt *attempt = (struct login_attempt*) reqbuf;
-    struct all_users users = {0};
+    struct all_usr users = {0};
     struct usr_rec usr = new_usr_rec();
     struct usr_rec cur = new_usr_rec();
 
