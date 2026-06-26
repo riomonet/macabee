@@ -41,34 +41,34 @@ enum ROLES {
 #define LABEL(id, yy, xx, ww, txt)                                  \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0, 0, 0, 0)
 
-#define INPUT(id, yy, xx, ww)                   \
+#define INPUT(id, yy, xx, ww)                           \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, 0,0,0)
 
-#define INPUT_F(id, yy, xx, ww,flg)		\
+#define INPUT_F(id, yy, xx, ww,flg)                     \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
 
-#define HL(id, yy, xx, ww)                      \
+#define HL(id, yy, xx, ww)                          \
     X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0, 0,0,0)
 
-#define LABEL_F(id, yy, xx, ww, txt, flg)                       \
+#define LABEL_F(id, yy, xx, ww, txt, flg)                           \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0, 0,0,0)
 
-#define LABEL_C(id, yy, xx, ww, txt, col)			\
+#define LABEL_C(id, yy, xx, ww, txt, col)                           \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col, 0,0,0)
 
-#define LABEL_FC(id, yy, xx, ww, txt, flg, col)			\
+#define LABEL_FC(id, yy, xx, ww, txt, flg, col)                         \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, 0,0,0)
 
-#define LABEL_FCF(id, yy, xx, ww, txt, flg, col)			\
+#define LABEL_FCF(id, yy, xx, ww, txt, flg, col)                        \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, CLICKABLE ,0,0)
 
-#define STATUS(id, yy, xx, ww, txt, flg)	\
+#define STATUS(id, yy, xx, ww, txt, flg)        \
     LABEL_F(id, xx, yy, ww, txt, flg)
 
-#define STATE(id, txt, flg, col)		\
+#define STATE(id, txt, flg, col)                \
     X(id, txt, sizeof(txt)-1, flg, col)
 
-#define STATE_LEN(id, txt, len, flg, col)	\
+#define STATE_LEN(id, txt, len, flg, col)       \
     X(id, txt, len, flg, col)
 
 #define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -87,21 +87,21 @@ enum ROLES {
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
-#define SCREENS_LIST						\
-    YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)		\
-    YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)		\
+#define SCREENS_LIST                                \
+    YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
+    YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
     YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    
 
 
 /* SCREEN STUBS */
-#define SCREEN_STUB_HEADER(SCR,title)					\
-    LABEL(SCR##_FLD_USER,1,7,32, "")					\
-    LABEL(SCR##_FLD_DATE,1,67,32, "")                     \
-    LABEL(SCR##_FLD_TIME,2,67,12, "")                   \
+#define SCREEN_STUB_HEADER(SCR,title)                                   \
+    LABEL(SCR##_FLD_USER,1,7,32, "")                                    \
+    LABEL(SCR##_FLD_DATE,1,67,32, "")                                   \
+    LABEL(SCR##_FLD_TIME,2,67,12, "")                                   \
     LABEL(SCR##_FLD_TITLE,1,29,21, title)                               \
     LABEL_FC(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
-#define SCREEN_STUB_FOOTER(SCR)				\
+#define SCREEN_STUB_FOOTER(SCR)                     \
     LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")	\
     LABEL(SCR##FLD_ARROW,24,1,4, "-->")             \
     HL(SCR##_FLD_HL1,26,1,100)                      \
@@ -109,15 +109,15 @@ enum ROLES {
     LABEL(SCR##_FLD_F2,28,19,9, "")                 \
     LABEL(SCR##_FLD_F3,28,31,16,"")                 \
     HL(SCR##_FLD_HL2,29,0,100)                      \
-    HL(SCR##_FLD_HL3,24,7,90)                        \
-    INPUT(SCR##_ISELECT,24,6,1)                              
+    HL(SCR##_FLD_HL3,24,7,90)                       \
+    INPUT(SCR##_ISELECT,24,6,1)
 
 /* LOGIN SCREEN col, row */
 #define LOGIN_SCREEN                                                    \
-    LABEL(LOGIN_L1       , 8,   9, 27,     "USER . . . . . . . . . . . ") \
-    LABEL(LOGIN_L2       , 10,   9, 27, "PASSWORD . . . . . . . . . ")     \
-    INPUT(LOGIN_IUSER    , 8,  38, 24)                                    \
-    INPUT_F(LOGIN_IPW    , 10, 38, 24,  PASSWORD)                         \
+    LABEL(LOGIN_L1       , 8,   9, 27, "USER . . . . . . . . . . . ")   \
+    LABEL(LOGIN_L2       , 10,  9, 27, "PASSWORD . . . . . . . . . ")   \
+    INPUT(LOGIN_IUSER    , 8,  38, 24)                                  \
+    INPUT_F(LOGIN_IPW    , 10, 38, 24,  PASSWORD)                       \
     LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
     LABEL_C(LOGIN_L4     , 1,  40, 19, "Marina 59 | Sign On", WHITE)    \
     STATUS(LOGIN_WARNING , 12, 38, 42, "", HIDDEN)                      
@@ -125,21 +125,34 @@ enum ROLES {
 /*   id, col, row, width */
 /* #define MAIN_SCREEN                                             \ */
 
-#define MAIN_SCREEN \
+#define MAIN_SCREEN                                             \
     SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )   \
-        LABEL(MAIN_L7,8,10,15,   "1. Contacts")             \
-        LABEL(MAIN_L8,9,10,17,   "2. Contracts")           \
-    LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
-    LABEL(MAIN_L10,11,10,15,  "4. Live montior")                \
+    LABEL(MAIN_L7,8,10,23,   "1. Add new M59 relationship")     \
     SCREEN_STUB_FOOTER(MAIN)
 
-#define MAIN_SCREEN_ALPHA			\
-    SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )	    \
-    LABEL(MAIN_L7,8,10,15,   "1. Contacts")                 \
-        LABEL(MAIN_L8,9,10,17,   "2. Contracts")           \
-    LABEL(MAIN_L9,10,10,17,  "3. Access Control")               \
-    LABEL(MAIN_L10,11,10,15,  "4. Live montior")                \
+
+#define MAIN_SCREEN_ALPHA                               \
+    SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )    \
+    LABEL(MAIN_L7,8,10,15,   "1. Send SMS invite")      \
+    LABEL(MAIN_L8,9,10,15,   "2. Send email invite")    \
+    LABEL(MAIN_L9,10,10,15,   "3. Add new contact")     \
     SCREEN_STUB_FOOTER(MAIN)
+
+/* FORM TEMPLATE */
+
+#define ADD_NEW_USER                                                    \
+    LABEL(ADD_USER_LAB_FIRST , 8 ,  9, 27, "FIRST NAME . . . . . . . . . . . ") \
+    LABEL(ADD_USER_LAB_LAST  , 10, 9, 27, "LAST NAME  . . . . . . . . . . . ") \
+    LABEL(ADD_USER_LAB_EMAIL , 12, 9, 27, "EMAIL  . . . . . . . . . . . . . ") \
+    LABEL(ADD_USER_LAB_PHONE , 14, 9, 27, "PHONE  . . . . . . . . . . . . . ") \
+    INPUT(ADD_FIRST    ,8,  38, 24)                                     \
+    INPUT(ADD_LAST     ,10, 38, 24)                                     \
+    INPUT(ADD_EMAIL    ,12, 38, 24)                                     \
+    INPUT(ADD_PHONE    ,14, 38, 24)                                     \
+    LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
+    LABEL_C(LOGIN_L4     , 1,  40, 19, "Marina 59 | Add New Macabee user", WHITE) \
+    STATUS(LOGIN_WARNING , 12, 38, 42, "", HIDDEN)
+ 
 
 /* MOBILE SCREENS (1,1) -> (59,45) */
 #define M_ACT_SCREEN                                                    \
@@ -365,12 +378,14 @@ void render_login_warning(struct player *player, char *txt) {
 #define DF(dval) x20 "DEFAULT" x20 #dval
 
 
+#define GENERIC32_T 32
 #define NAME_T 25
 #define EMAIL_T 128
 #define PHONE_T 17 //phone
 #define BLOB_T 512
 #define PW_HASH_T crypto_pwhash_STRBYTES
 
+typedef char generic32_T[GENERIC32_T];
 typedef char name_t  [NAME_T]; 
 typedef char email_t [EMAIL_T];
 typedef char phone_t  [PHONE_T];
@@ -378,12 +393,32 @@ typedef char pw_t[PW_HASH_T];
 
 #define BIND_TEXT(stmt, col_num, field)sqlite3_bind_text(stmt, col_num, field, -1, SQLITE_STATIC)
 #define BIND_INT(stmt, col_num, field) sqlite3_bind_int(stmt,  col_num, field)
+
 #define BIND_name_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
 #define BIND_email_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
 #define BIND_phone_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
 #define BIND_pw_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
+#define BIND_generic32_t(stmt, col_num, field) BIND_TEXT(stmt,col_num, field)
+
 #define BIND_u8(stmt, col_num, field) BIND_INT(stmt, col_num, field)
 #define BIND_u16(stmt, col_num, field) BIND_INT(stmt, col_num, field)
+#define BIND_u32(stmt, col_num, field) BIND_INT(stmt, col_num, field)
+#define BIND_u64(stmt, col_num, field) BIND_INT(stmt, col_num, field)
+
+
+#define ACCESS_INT(stmt, col_num,field) table->rec[i].field = sqlite3_column_int(stmt,col_num);
+#define ACCESS_TEXT(stmt,col_num,field) strcpy(table->rec[i].field, (const char *)sqlite3_column_text(stmt,col_num));
+
+#define ACCESS_name_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num,field)
+#define ACCESS_email_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+#define ACCESS_phone_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+#define ACCESS_pw_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+#define ACCESS_generic32_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
+
+#define ACCESS_u8(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
+#define ACCESS_u16(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
+#define ACCESS_u32(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
+#define ACCESS_u64(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
 
 
 /* TABLE INDEX */
@@ -392,8 +427,9 @@ typedef char pw_t[PW_HASH_T];
     X(pw,  PW_SCHEMA)                          \
     X(dev, DEV_SCHEMA)
 
-/* COLUMN DEFINTIONS FOR ALL SCHEMA */
+/* TABLES */
 
+/* mk1 */
 /* pw.id == usr.id */
 #define PW_SCHEMA                                   \
     TCV(PW_C,  id,  u16,  INTEGER, NN UQ)           \
@@ -407,6 +443,13 @@ typedef char pw_t[PW_HASH_T];
     TCV(USR_C,  phone, phone_t, TEXT)           \
     TCV(USR_C,  first, name_t, TEXT)            \
     TCVL(USR_C, last, name_t, TEXT)			
+
+/* ID = usr_id */
+#define INVITATION_SCHEMA                                               \
+    TCV(INVITE_C, id, u16, INTEGER, NN)                                 \
+    TCV(INVITE_C, token, generic32_t, TEXT, NN )                        \
+    TCV(INVITE_C, expiry, u64, INTEGER, NN)                             \
+    TCVL(INVITE_C, type, u8, INTEGER, DF(0)) /* 0 email invitation, 1 for sms invitation */
 
 #define DEV_SCHEMA                                                      \
     TCV(DEV_C,  id, u16, INTEGER, PK)                                   \
@@ -559,15 +602,6 @@ DB_TABLES
 #undef X
 
 
-#define ACCESS_INT(stmt, col_num,field) table->rec[i].field = sqlite3_column_int(stmt,col_num);
-#define ACCESS_TEXT(stmt,col_num,field) strcpy(table->rec[i].field, (const char *)sqlite3_column_text(stmt,col_num));
-#define ACCESS_u8(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
-#define ACCESS_u16(stmt, col_num, field) ACCESS_INT(stmt, col_num, field)
-#define ACCESS_name_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num,field)
-#define ACCESS_email_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
-#define ACCESS_phone_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
-#define ACCESS_pw_t(stmt, col_num, field) ACCESS_TEXT(stmt,col_num, field)
-
 
 #define TCV(tbl, name, ctype, type, ...) ACCESS_##ctype(stmt,tbl##_##name, name )
 #define TCVL(tbl,name, ctype,type,  ...) ACCESS_##ctype(stmt,tbl##_##name, name)
@@ -641,6 +675,40 @@ DB_TABLES
 #undef TCV
 #undef TCVL
 
+#define X(name, SCHEMA) \
+    sqlite3_stmt *delete_##name##_stmt = NULL;
+DB_TABLES
+#undef X
+
+#define X(name, SCHEMA)                                         \
+    int delete_##name(sqlite3 *db, struct name##_rec *rec) {    \
+                                                                \
+    if(!delete_##name##_stmt) {                                 \
+                                                                \
+    char buf[512];                                              \
+                                                                \
+    snprintf(buf,512,"DELETE FROM " #name                       \
+    "WHERE id = ?");                                            \
+                                                                \
+    delete_##name##_stmt = create_statement(db,buf);            \
+    }                                                           \
+    sqlite3_stmt *stmt = delete_##name##_stmt;                  \
+    sqlite3_bind_int(stmt, 1 , rec->id);                        \
+    int rc = sqlite3_step(stmt);                                \
+    if(rc != SQLITE_DONE) {                                     \
+    fprintf(stderr, "delete_ %s\n", sqlite3_errmsg(db));        \
+    }                                                           \
+    sqlite3_reset(stmt);                                        \
+    sqlite3_clear_bindings(stmt);                               \
+    return rc == SQLITE_DONE;                                   \
+    }
+ 
+DB_TABLES
+
+#undef X
+#undef TCV
+#undef TCVL
+
 
 #undef x20
 #undef COMMA
@@ -650,7 +718,6 @@ DB_TABLES
 #undef DF
 #undef TBC_FK
 #undef TBCL_FK
-
 
 
 /* ---------------------------------  CRUD QUERIES    ------------------------------------------------------------ */
@@ -784,10 +851,11 @@ void pw_encrypt_and_add_to_db(sqlite3 *db, int uid, char *clr_pw) {
                            crypto_pwhash_OPSLIMIT_INTERACTIVE,
                            crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         perror("FAILED TO HASH PASSWORD");
-        exit(1); //TODO: How should I handle this case???
+        exit(1); //T0DO: How should I handle this case???
     }
     create_pw(db, &pw);
 }
+
 
 /* Retrieve pw_hash from the database searching by uid.
  * Verify hashed clr_pw matches what is in the db. Return 1
@@ -886,7 +954,7 @@ int snv_email(char *email, char *cln) {
     return 1;
 }
 
-/* TODO:(ari) Deal with country code in better way.  */
+/* NOTE:(ari) Deal with country code in better way.  */
 int snv_phone(char *phone, char *cln) {
     int p = 1;
     cln[0] = '+';
@@ -1304,9 +1372,16 @@ void console_add_admin(sqlite3 *db) {
 
     if(add[0] == 'y') {
         pw_encrypt_and_add_to_db(db, usr.id, pass);
-        strcpy(usr.uname, "alpha");
+        strcpy(usr.uname, "alpha"); 
         usr.role = ROLE_ALPHA;
-        create_usr(db, &usr);
+
+
+        /* TODO: Need to handle this in the application interactively with user feedback. */        
+        int res = create_usr(db, &usr);
+        if(!res) {
+            fprintf(stderr,"Unable to create usr at line %d in file %s \n", __LINE__, __FILE__);
+            exit (1);
+        }
     }
 }
 
