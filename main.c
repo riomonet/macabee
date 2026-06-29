@@ -87,10 +87,82 @@ enum ROLES {
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
+typedef int (*screen_handler)(u8, u8);
+typedef void(*screen_renderer)(u8);
+
 #define SCREENS_LIST                                \
     YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
     YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
-    YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    
+    YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)
+
+
+#define YMB(SCR,scr,IC) SCRID_##SCR,
+enum SCRID {SCREENS_LIST};
+#undef YMB
+
+#define YMB(scrid, name, select)                \
+    int handler_##name(u8,u8);
+
+SCREENS_LIST
+#undef YMB
+
+#define YMB(scrid, name, select)                \
+    void renderer_##name(u8);
+
+
+SCREENS_LIST
+#undef YMB
+
+#define YMB(scrid, name, select)                \
+    [SCRID_##scrid] = handler_##name,
+
+screen_handler screen_handlers[] = {
+    SCREENS_LIST
+};
+#undef YMB
+
+#define YMB(scrid, name, select)                \
+    [SCRID_##scrid] = NULL,
+
+screen_renderer screen_renderers[] ={
+    SCREENS_LIST
+};
+#undef YMB
+
+
+enum H_MAIN_SCREEN {
+    H_MAIN_LOGOUT
+};
+
+int handler_main_screen(u8 x, u8 y) {
+    (void) x;
+    (void) y;
+    return H_MAIN_LOGOUT;
+}
+
+enum rc_handler_login_screen {
+    RC_HANDLER_LOGIN_LOGOUT
+};
+
+
+int handler_login_screen(u8 x, u8 y) {
+    (void) x;
+    (void) y;
+    return 1;
+}
+
+
+enum rc_handler_m_act_screen {
+    RC_HANDLER_M_ACT_LOGOUT
+};
+
+int handler_m_act_screen(u8 x, u8 y) {
+    (void) x;
+    (void) y;
+    return 1;
+}
+
+
 
 
 /* SCREEN STUBS */
@@ -263,11 +335,8 @@ struct live_screen {
 
 /* Global Screen templates:  */
 
-#define YMB(SCR,scr,IC) IN_##SCR,
-enum SCRID {SCREENS_LIST};
-#undef YMB
 
-#define YMB(SCR,scr,IC)	[IN_##SCR] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
+#define YMB(SCR,scr,IC)	[SCRID_##SCR] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
 struct screen screens[] = {SCREENS_LIST};
 #undef YMB
 
@@ -300,7 +369,7 @@ struct player *players = NULL;
 struct player *onboard_new_player(struct mg_connection *c) {
     struct player *player = (struct player*) malloc(sizeof(*player));
     player->c = c;
-    player->scrid = IN_LOGIN_SCREEN;
+    player->scrid = SCRID_LOGIN_SCREEN;
     player->auth.logintim = 0;
     player->auth.attempts = 0;
     player->auth.role = 0;
@@ -1036,6 +1105,7 @@ void set_live_screen(struct player *player, enum SCRID scrid) {
     memcpy(scr->state, tmpl.state, tmpl.nFields * sizeof(struct field_state));
 }
 
+
 void today(char *buf, int len) {
     
     time_t now = time(NULL);
@@ -1064,14 +1134,14 @@ void set_screen_text(struct player *player, int col, char *txt) {
     set_screen_text(player,SCR##_FLD_DATE, date);
 
 void goto_main_screen(struct player *player) {
-    set_live_screen(player, IN_MAIN_SCREEN);
+    set_live_screen(player, SCRID_MAIN_SCREEN);
     TITLE_BAR(MAIN_SCREEN)
 	
     mb_send(player);    
 }
 
 void goto_m_activate_screen(struct player *player) {
-    set_live_screen(player, IN_M_ACT_SCREEN);
+    set_live_screen(player, SCRID_M_ACT_SCREEN);
     mb_send(player);
 }
 
@@ -1091,7 +1161,7 @@ void mb_update(struct player *player, int nFields, int IC, struct field_state *u
 void tick(char *time) {
     struct player *p = players;
     for(p = players; p != NULL; p = p->hh.next) {
-        if(p->scrid == IN_MAIN_SCREEN) {
+        if(p->scrid == SCRID_MAIN_SCREEN) {
             struct field_state f[] = {main_screen_state[MAIN_SCREEN_FLD_TIME]};
             f[0].text_len = strlen(time);
     strcpy(f[0].text, time);
@@ -1101,7 +1171,7 @@ void tick(char *time) {
 }
 
 void goto_main_screen_alpha(struct player *player) {
-    set_live_screen(player, IN_MAIN_SCREEN);
+    set_live_screen(player, SCRID_MAIN_SCREEN);
     // set user name
     // set date
     // set time with seconds.....
@@ -1109,7 +1179,7 @@ void goto_main_screen_alpha(struct player *player) {
 }
 
 void goto_login_screen(struct player *player) {
-    set_live_screen(player, IN_LOGIN_SCREEN);
+    set_live_screen(player, SCRID_LOGIN_SCREEN);
     mb_send(player);    
 }
 
@@ -1177,6 +1247,40 @@ int try_login(struct player *player, u8 *reqbuf) {
     }
 }
 
+
+/* array of handler functions to handle interactions with screens indexed by scrid */
+/* array of render functions to render screens indexed by scrid */
+/* 2d navigation array 2 lookup and assign next screen based on return value of handler func */
+
+#if 0
+/* every screen gets a handler */
+int scr_handler_main_menu(struct player *player, u8 Aidkey, u8 *inputs) {
+    // extract AIDkey
+    // extract inputs/if necessary
+    // if errors render errors.
+    // handle keys
+    // return outcomes
+}
+#endif
+
+
+#if 0
+/* variable outcomes */
+const u8 navigation_routing_table[][32] = {
+    [MAIN_SCREEN] = {
+        [OUTCOME_GOTO_ADD_USER] = SCR_ADD_USER_FORM,
+        [OUTCOME_GOTO_VESSELS]  = SCR_VESSEL_ENTRY,
+        [OUTCOME_GOTO_REPORTS]  = SCR_REPORTS_MENU
+    },
+    
+    [LOGIN_SCREEN] = {
+        [OUTCOME_SUCCESS]       = SCR_MAIN_MENU, // Saved -> back to menu
+        [OUTCOME_LOGOUT]        = SCR_MAIN_MENU  // Pressed Esc -> back to menu
+    }
+};
+#endif
+
+
 /* Dispatch Business Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
     (void) reqbuflen;
@@ -1197,11 +1301,11 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
     } 	/* Player is in the world.  The cases are responses to MAIN_SCREEN_ID*/ else {
         
         switch(player->scrid) {
-        case IN_M_ACT_SCREEN:
+        case SCRID_M_ACT_SCREEN:
             {
                 goto_m_activate_screen(player);
             } break;
-        case IN_LOGIN_SCREEN:         
+        case SCRID_LOGIN_SCREEN:         
             {
 		if (try_login(player,reqbuf)) {
 		    switch (player->auth.role) {
@@ -1211,7 +1315,7 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
 		    break;
 		}
             } break;
-	case IN_MAIN_SCREEN:
+	case SCRID_MAIN_SCREEN:
 	    {
 		//get_next_screen(player)
 		//get_AID_KEY();
