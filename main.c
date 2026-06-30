@@ -14,6 +14,7 @@
 #include "sqlite3.h"
 #include "cJSON.h"
 #include "mac_types.h"
+#include "mac_function_prototypes.h"
 
 #define DEV_MODE 1
 #define DB_RESET 0
@@ -75,15 +76,15 @@ enum ROLES {
 #define STR2(X) #X
 #define STR(X) STR2(X)
 
-#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos, cnt)   \
-    {       .op_A = (opA),                                  \
-            .op_B = (opB),                                  \
-            .layout = (layout_arr),                         \
-            .state = (state_arr),                           \
-    .nFields = cnt,                                         \
-            .ic = (cursor_pos)                              \
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos, cnt) \
+    {                                                                   \
+    .op_A = (opA),                                                      \
+    .op_B = (opB),                                                      \
+    .layout = (layout_arr),                                             \
+    .state = (state_arr),                                               \
+    .nFields = cnt,                                                     \
+    .ic = (cursor_pos)                                                  \
     }
-
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
@@ -94,10 +95,7 @@ typedef void(*screen_renderer)(struct player *);
     YMB(LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
     YMB(MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
     YMB(M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
-    YMB(MENU_TEMPLATE, menu_template,IC_NONE)   
-
-#define SCREEN_TEMPLATES                        \
-    YMB(MENU_TEMPLATE, menu_template,IC_NONE)   
+    YMB(ANC_SCREEN, anc_screen, ANC_FIRST)
 
 
 /* ENUM FOR SCRID, SCRID_NO_SCREEN is screen 0 */
@@ -141,8 +139,6 @@ screen_renderer screen_renderers[] ={
 };
 #undef YMB
 
-
-
 /* HANDLERS AND RENDERERS */
 
 #define H_NO_ACTION 0xFFFFFFFFu
@@ -170,46 +166,59 @@ int handler_no_screen(struct player *p, u8 *reqbuf) {
 
 /*______________________________MAIN SCREEN__________________________ */
 
-int handler_menu_template(struct player *p , u8 *reqbuf) {
-    (void)    p;
-    (void)    reqbuf;
+
+enum H_MAIN_SCREEN {
+    H_MAIN_SCR_LOGOUT,
+    H_MAIN_SCR_ANC
+};
+
+int handler_main_screen(struct player *p , u8 *reqbuf) {
+    (void) p;
+
+    int k = reqbuf[1];
+    switch(k) {
+
+    case F2: {
+        logout_player(p);
+        return H_MAIN_SCR_LOGOUT;
+    }
+    case F6: break;
+    case ENTER:
+        if(reqbuf[5] == '1') {
+            return H_MAIN_SCR_ANC;
+        } break;
+    }
+    return H_NO_ACTION;
+}
+    
+
+
+enum H_ANC_SCREEN {
+    H_ANC_SCR_LOGOUT,
+    H_ANC_SCR_MAIN
+};
+
+int handler_anc_screen(struct player *p , u8 *reqbuf) {
+    int k = reqbuf[1];
+    switch(k) {
+    case F2: {
+        logout_player(p);
+        return H_ANC_SCR_LOGOUT;
+    }
+    case F8: {
+        return H_ANC_SCR_MAIN;
+    }
+    case ENTER:
+        return H_NO_ACTION; // NOTE:temp
+        // snv items
+        // show confirmation screen
+        // confirm add and goto main menu
+    default:
+        return H_NO_ACTION;
+    }
     return 0;
 }
 
-
-void renderer_menu_template(struct player *p) {
-    char *r[] = {
-        "ari", "safari", "zoo"
-    };
-}
-
-enum H_MAIN_SCREEN {
-    H_MAIN_LOGOUT
-};
-
-
-int handler_main_screen(struct player *p , u8 *reqbuf) {
-
-    p->scrat = 1;
-    //    (void) p;
-    (void) reqbuf;
-    #if 0
-    int k = get_aid_key(reqbuf);
-    switch(k) {
-    case 0xf1: break;
-    case 0xf2: break;
-    case 0xf3: break;
-    case 0xFF: break;
-    }
-    #endif
-    return H_NO_ACTION;
-}
-
-void renderer_main_screen(struct player *p) {
-    (void)p;
-        
-}
-    
 
 /*______________________________LOGIN SCREEN__________________________ */
 enum H_LOGIN_SCREEN {
@@ -275,24 +284,29 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
 
 #define MAIN_SCREEN                                             \
     SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )   \
-    LABEL(MAIN_L7,8,10,21,   "1. Create New Contact")           \
+    LABEL(MAIN_L7,8,10,21,   "1. Add new customer.")                \
     SCREEN_STUB_FOOTER(MAIN)
 
 
-#define MENU_TEMPLATE                           \
-    LABEL_F(MENU_1 , 8, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_2 ,10, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_3 ,12, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_4 ,14, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_5 ,16, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_6 ,18, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_7 ,20, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_8 ,22, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_9 ,24, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_10,26, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_11,28, 9, 27, "",HIDDEN)       \
-    LABEL_F(MENU_12,30, 9, 27, "",HIDDEN) 
-        
+#define ANC_SCREEN                                                      \
+    LABEL(ANC_L1       , 8,   9, 27, "FIRST  . . . . . . . . . . . ")   \
+    LABEL(ANC_L2       , 10,  9, 27, "LAST   . . . . . . . . . . . ")   \
+    LABEL(ANC_L3       , 12,  9, 27, "EMAIL  . . . . . . . . . . . ")   \
+    LABEL(ANC_L4       , 14,  9, 27, "PHONE  . . . . . . . . . . . ")   \
+    INPUT(ANC_FIRST    , 8,  38, 24)                                    \
+    INPUT(ANC_LAST      ,10, 38, 24)                                    \
+    INPUT(ANC_EMAIL    , 12, 38, 24)                                    \
+    INPUT(ANC_PHONE    , 14, 38, 24)                                    \
+    LABEL_FC(ANC_INST    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
+    LABEL_C(ANC_TITLE     , 1,  40, 19, "Marina 59 | Add new customer", WHITE) \
+    STATUS(ANC_WARNING , 12, 38, 42, "", HIDDEN)                        \
+    HL(ANC_HL1,26,1,100)                                                \
+    LABEL_FC(ANC_F1,28,6,9,"F2=Logout", FAINT, CYAN)                    \
+    LABEL_FC(ANC_F2,28,19,20,"F8=Back to Main Menu",FAINT, CYAN )       \
+    HL(ANC_HL2,29,1,100)                          
+
+    
+
 
 #define MAIN_SCREEN_ALPHA                               \
     SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )    \
@@ -414,6 +428,17 @@ struct screen screens[] = {SCREENS_LIST};
  * a container of 'player' who have connected. They are either 
  * in an authorized or unauthorized state. */
 struct player *players = NULL;
+
+
+void logout_player(struct player *player) {
+    player->scrat = 0;
+    player->auth.logintim = 0;
+    player->auth.attempts = 0;
+    player->auth.role = 0;
+    memset(player->auth.uname, 0, sizeof(player->auth.uname)); 
+    player->auth.id = UID_NF;           
+    player->auth.locked_until = 0;
+}
 
 /* Add a new player to the world. The player will start in
  * an unauthenticated state on 'SCR_LOGIN'. */
@@ -1102,37 +1127,6 @@ int snv_name(char *name, char *cln) {
     return 1;
 }
 
-/* client req header item */
-struct __attribute__((packed)) cfh {
-    u8 opcode;
-    u8 AID;
-    u8 nFields;
-};
-
-/* client req field block field item */
-struct __attribute__((packed)) cfb {
-    u8 id; //field_id
-    u8 len;
-    char val[24]; 
-};
-
-struct login_attempt {
-    struct cfh head;
-    struct cfb username;
-    struct cfb password;
-};
-
-void print_login_attempt(struct login_attempt *login) {
-    printf("**********************************************************\n"); 
-    printf("feild-id: %d\t",login->username.id);
-    printf("field_len: %d\t", login->username.len);
-    printf("text: %.*s\n",24,login->username.val);
-    printf("feild-id: %d\t",login->password.id);
-    printf("field_len: %d\t", login->password.len);
-    printf("text: %.*s\n",24,login->password.val);
-    printf("**********************************************************\n");
-}
-
 struct usr_rec new_usr_rec() {
     struct usr_rec usr = {
         .id = UID_NF,
@@ -1295,7 +1289,6 @@ int try_login(struct player *player, u8 *reqbuf) {
         }
 }
 
-
 /* variable outcomes */
 const u8 screen_router[][32] = {
     [SCRID_NO_SCREEN] = {
@@ -1305,13 +1298,16 @@ const u8 screen_router[][32] = {
     [SCRID_LOGIN_SCREEN] = {
         [H_LOGIN_SCR_SUCCESS]  = SCRID_MAIN_SCREEN,
         // NOTE: failed login return H_NO_ACTION from handler
+    },
+    [SCRID_MAIN_SCREEN] = {
+        [H_MAIN_SCR_LOGOUT] = SCRID_LOGIN_SCREEN,
+        [H_MAIN_SCR_ANC] = SCRID_ANC_SCREEN
+    },
+    [SCRID_ANC_SCREEN] = {
+        [H_ANC_SCR_LOGOUT] = SCRID_LOGIN_SCREEN,
+        [H_ANC_SCR_MAIN] = SCRID_MAIN_SCREEN
     }
     
-    /* [SCRID_MAIN_SCREEN] = { */
-    /*     [OUTCOME_GOTO_ADD_USER] = SCR_ADD_USER_FORM, */
-    /*     [OUTCOME_GOTO_VESSELS]  = SCR_VESSEL_ENTRY, */
-    /*     [OUTCOME_GOTO_REPORTS]  = SCR_REPORTS_MENU */
-    /* }, */
 };
 
 

@@ -140,7 +140,7 @@
 
 
          const AID_KEYS = Object.freeze ({
-             'Enter': 0x7D,
+             'Enter': 0xFF,
              'F1':    0xF1,
              'F2':    0xF2,
              'F3':    0xF3,
@@ -150,9 +150,6 @@
              'F7':    0xF7,
              'F8':    0xF8,
              'F9':    0xF9,
-             'F10':   0x7A,
-             'F11':   0x7B,
-             'F12':   0x7C,
          });
 
          const OPCODE_A = Object.freeze ({
@@ -316,7 +313,10 @@
          }
 
          function add_AID_keys() {
-	         add_key_event_listeners('Enter', 'keydown', send_changed_inputs_only);
+	                             add_key_event_listeners('Enter', 'keydown', send_changed_inputs_only);
+                                 add_key_event_listeners('F2', 'keydown', send_changed_inputs_only);
+                                 add_key_event_listeners('F6', 'keydown', send_changed_inputs_only);
+                                 add_key_event_listeners('F8', 'keydown', send_changed_inputs_only);
          }
 
          function set_dirty() {

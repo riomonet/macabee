@@ -142,4 +142,27 @@ struct player {
 
 
 
+/* client req header item */
+struct __attribute__((packed)) cfh {
+    u8 opcode;
+    u8 AID;
+    u8 nFields;
+};
+
+/* client req field block field item */
+struct __attribute__((packed)) cfb {
+    u8 id; //field_id
+    u8 len;
+    char val[24]; 
+};
+
+struct login_attempt {
+    struct cfh head;
+    struct cfb username;
+    struct cfb password;
+};
+
+
+
+
 #endif
