@@ -94,4 +94,13 @@ enum FLAGS_H {
 };
 
 
+enum AID_KEYS {
+    F2 = 0xF2,
+    F6 = 0xF6,
+    F7 = 0xF7,
+    F8 = 0xF8,
+    F9 = 0xF9,
+    ENTER = 0xFF
+};
+
 #endif

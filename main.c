@@ -15,7 +15,7 @@
 #include "cJSON.h"
 #include "uthash.h"
 
-#define DEV_MODE 0
+#define DEV_MODE 1
 #define DB_RESET 0
 
 #define UID_NF UINT16_MAX // UID NOT FOUND. [SENTINEL]
@@ -63,7 +63,7 @@ enum ROLES {
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, CLICKABLE ,0,0)
 
 #define STATUS(id, yy, xx, ww, txt, flg)        \
-    LABEL_F(id, xx, yy, ww, txt, flg)
+    LABEL_F(id, yy, xx, ww, txt, flg)
 
 #define STATE(id, txt, flg, col)                \
     X(id, txt, sizeof(txt)-1, flg, col)
@@ -86,37 +86,42 @@ enum ROLES {
 
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
-
-typedef int (*screen_handler)(u8, u8);
-typedef void(*screen_renderer)(u8);
+struct player;
+typedef int (*screen_handler)(struct player *, u8 *);
+typedef void(*screen_renderer)(struct player *);
 
 #define SCREENS_LIST                                \
-    YMB (LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
-    YMB (MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
-    YMB (M_ACT_SCREEN, m_act_screen, M_ACT_CODE)
+    YMB(LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
+    YMB(MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
+    YMB(M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
 
-
+/* ENUM FOR SCRID, SCRID_NO_SCREEN is screen 0 */
 #define YMB(SCR,scr,IC) SCRID_##SCR,
-enum SCRID {SCREENS_LIST};
+enum SCRID {SCRID_NO_SCREEN, SCREENS_LIST};
 #undef YMB
 
+/* Function prototypes for handlers  */
 #define YMB(scrid, name, select)                \
-    int handler_##name(u8,u8);
+    int handler_##name(struct player *p,u8 *reqbuf);
 
+int handler_no_screen(struct player *p,u8 *reqbuf);
 SCREENS_LIST
 #undef YMB
 
+/* Function prototypes for renderers */
 #define YMB(scrid, name, select)                \
     void renderer_##name(u8);
 
-
+void renderer_no_screen(u8);
 SCREENS_LIST
 #undef YMB
 
+/* Array of handlers */
 #define YMB(scrid, name, select)                \
     [SCRID_##scrid] = handler_##name,
 
 screen_handler screen_handlers[] = {
+    [SCRID_NO_SCREEN] = handler_no_screen,
     SCREENS_LIST
 };
 #undef YMB
@@ -125,44 +130,86 @@ screen_handler screen_handlers[] = {
     [SCRID_##scrid] = NULL,
 
 screen_renderer screen_renderers[] ={
+    [SCRID_NO_SCREEN] = NULL,
     SCREENS_LIST
 };
 #undef YMB
-
 
 enum H_MAIN_SCREEN {
     H_MAIN_LOGOUT
 };
 
-int handler_main_screen(u8 x, u8 y) {
-    (void) x;
-    (void) y;
-    return H_MAIN_LOGOUT;
-}
+/* HANDLERS AND RENDERERS */
 
-enum rc_handler_login_screen {
-    RC_HANDLER_LOGIN_LOGOUT
+#define H_NO_ACTION 0xFFFFFFFFu
+
+enum H_NO_SCREEN {
+    H_NO_SCR_WEB_LOGIN,
+    H_NO_SCR_MOBILE_ACTIVATE
 };
 
+int handler_no_screen(struct player *p, u8 *reqbuf) {
 
-int handler_login_screen(u8 x, u8 y) {
-    (void) x;
-    (void) y;
-    return 1;
+
+    (void) p;
+    int Op_A = reqbuf[0];
+    /* web user */
+    if(Op_A == 0x88) {
+        return H_NO_SCR_WEB_LOGIN;
+    }
+    
+    /* mobile user */
+    else if (Op_A == 0x89) {
+        return H_NO_SCR_MOBILE_ACTIVATE;
+    }
+    return H_NO_ACTION;
 }
 
+/*______________________________MAIN SCREEN__________________________ */
 
-enum rc_handler_m_act_screen {
+
+int handler_main_screen(struct player *p , u8 *reqbuf) {
+    (void) p;
+    (void) reqbuf;
+    #if 0
+    int k = get_aid_key(reqbuf);
+    switch(k) {
+    case 0xf1: break;
+    case 0xf2: break;
+    case 0xf3: break;
+    case 0xFF: break;
+    }
+    #endif
+    return H_NO_ACTION;
+}
+
+/*______________________________LOGIN SCREEN__________________________ */
+enum H_LOGIN_SCREEN {
+    H_LOGIN_SCR_SUCCESS,
+};
+int try_login(struct player *, u8 *);
+int handler_login_screen(struct player *p, u8 *reqbuf) {
+    if (try_login(p,reqbuf)) {
+        return H_LOGIN_SCR_SUCCESS;
+    }
+    
+    return H_NO_ACTION;
+}
+
+/*______________________________END LOGIN SCREEN__________________________ */
+
+
+enum H_M_ACT_SCREEN {
     RC_HANDLER_M_ACT_LOGOUT
 };
 
-int handler_m_act_screen(u8 x, u8 y) {
-    (void) x;
-    (void) y;
-    return 1;
+
+/* MOBILE HANDLERS AND RENDERERS */
+int handler_m_act_screen(struct player *p, u8 *reqbuf) {
+    (void) p;
+    (void) reqbuf;
+     return 1;
 }
-
-
 
 
 /* SCREEN STUBS */
@@ -171,20 +218,24 @@ int handler_m_act_screen(u8 x, u8 y) {
     LABEL(SCR##_FLD_DATE,1,67,32, "")                                   \
     LABEL(SCR##_FLD_TIME,2,67,12, "")                                   \
     LABEL(SCR##_FLD_TITLE,1,29,21, title)                               \
-    LABEL_FC(MAIN_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
+    LABEL_FC(SCR##_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
 #define SCREEN_STUB_FOOTER(SCR)                     \
     LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")	\
     LABEL(SCR##FLD_ARROW,24,1,4, "-->")             \
     HL(SCR##_FLD_HL1,26,1,100)                      \
-    LABEL(SCR##_FLD_F1,28,6,9,"")                   \
+    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT, CYAN)   \
     LABEL(SCR##_FLD_F2,28,19,9, "")                 \
     LABEL(SCR##_FLD_F3,28,31,16,"")                 \
     HL(SCR##_FLD_HL2,29,0,100)                      \
     HL(SCR##_FLD_HL3,24,7,90)                       \
     INPUT(SCR##_ISELECT,24,6,1)
 
-/* LOGIN SCREEN col, row */
+
+#define NO_SCREEN NULL
+#define IC_NONE -1
+
+/* LOGIN SCREEN row, col */
 #define LOGIN_SCREEN                                                    \
     LABEL(LOGIN_L1       , 8,   9, 27, "USER . . . . . . . . . . . ")   \
     LABEL(LOGIN_L2       , 10,  9, 27, "PASSWORD . . . . . . . . . ")   \
@@ -199,7 +250,7 @@ int handler_m_act_screen(u8 x, u8 y) {
 
 #define MAIN_SCREEN                                             \
     SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )   \
-    LABEL(MAIN_L7,8,10,23,   "1. Add new M59 relationship")     \
+    LABEL(MAIN_L7,8,10,21,   "1. Create New Contact")           \
     SCREEN_STUB_FOOTER(MAIN)
 
 
@@ -210,7 +261,6 @@ int handler_m_act_screen(u8 x, u8 y) {
     LABEL(MAIN_L9,10,10,15,   "3. Add new contact")     \
     SCREEN_STUB_FOOTER(MAIN)
 
-/* FORM TEMPLATE */
 
 #define ADD_NEW_USER                                                    \
     LABEL(ADD_USER_LAB_FIRST , 8 ,  9, 27, "FIRST NAME . . . . . . . . . . . ") \
@@ -223,7 +273,7 @@ int handler_m_act_screen(u8 x, u8 y) {
     INPUT(ADD_PHONE    ,14, 38, 24)                                     \
     LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
     LABEL_C(LOGIN_L4     , 1,  40, 19, "Marina 59 | Add New Macabee user", WHITE) \
-    STATUS(LOGIN_WARNING , 12, 38, 42, "", HIDDEN)
+    STATUS(LOGIN_WARNING , 32, 12, 42, "", HIDDEN)
  
 
 /* MOBILE SCREENS (1,1) -> (59,45) */
@@ -369,7 +419,7 @@ struct player *players = NULL;
 struct player *onboard_new_player(struct mg_connection *c) {
     struct player *player = (struct player*) malloc(sizeof(*player));
     player->c = c;
-    player->scrid = SCRID_LOGIN_SCREEN;
+    player->scrid = SCRID_NO_SCREEN;
     player->auth.logintim = 0;
     player->auth.attempts = 0;
     player->auth.role = 0;
@@ -403,6 +453,10 @@ void set_field_text(struct screen *scr, int field, char *value) {
     strcpy(scr->state[field].text, value);
 }
 
+
+
+ 
+/* TODO: Make this more general, it should take a column color and text */
 void render_login_warning(struct player *player, char *txt) {
 
     struct field_state buf[1];
@@ -420,15 +474,13 @@ void render_login_warning(struct player *player, char *txt) {
     f.text_len = strlen(f.text);
     
     buf[0] = f;
-    /* player->scr.state = buf;	 */
+    memcpy(player->scr.state,buf, sizeof(*buf)) ;
     mb_send(player);
 }
-
 
 /* ============================================================================
               DATABASE TABLE AND CRUD MACROS GENERATION SYSTEM (TCGS)
 =============================================================================== */
-
 
 #define SQLITE_JOURNAL_MODE wal
 #define SQLITE_SYNC normal
@@ -797,7 +849,7 @@ sqlite3_stmt *create_statement(sqlite3 *db, char *q) {
     sqlite3_stmt *stmt;
     int rc =  sqlite3_prepare_v2(db, q, SQLITE_READ_TO_NUL, &stmt,NULL);
     if(rc != SQLITE_OK) {
-        fprintf(stderr, "CREATE_STATMENT ERROR: %s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "CREATE_STATMENT ERROR: %s %s\n", sqlite3_errmsg(db), q);
         exit(1);
     }
     return stmt;
@@ -1107,11 +1159,9 @@ void set_live_screen(struct player *player, enum SCRID scrid) {
 
 
 void today(char *buf, int len) {
-    
     time_t now = time(NULL);
     struct tm *tm = localtime(&now);
     strftime(buf, len, "%a %b %d, %Y", tm);
-
 }
 
 void time_now(char *buf, int len) {
@@ -1136,14 +1186,9 @@ void set_screen_text(struct player *player, int col, char *txt) {
 void goto_main_screen(struct player *player) {
     set_live_screen(player, SCRID_MAIN_SCREEN);
     TITLE_BAR(MAIN_SCREEN)
-	
     mb_send(player);    
 }
 
-void goto_m_activate_screen(struct player *player) {
-    set_live_screen(player, SCRID_M_ACT_SCREEN);
-    mb_send(player);
-}
 
 /* On  update just send the correct opcdoe and thee  */
 void mb_update(struct player *player, int nFields, int IC, struct field_state *update) {
@@ -1178,13 +1223,6 @@ void goto_main_screen_alpha(struct player *player) {
     mb_send(player);    
 }
 
-void goto_login_screen(struct player *player) {
-    set_live_screen(player, SCRID_LOGIN_SCREEN);
-    mb_send(player);    
-}
-
-
-
 int try_activate(struct player *player,u8 *reqbuf) {
     (void) player;
     struct cfh *header = (struct cfh *)reqbuf;
@@ -1197,12 +1235,18 @@ int try_activate(struct player *player,u8 *reqbuf) {
 int try_login(struct player *player, u8 *reqbuf) {
 
     /* Prevents login. 3 seconds after 3 missed attempts */
+
     if (time(NULL) < player->auth.locked_until) {
-	render_login_warning(player, "Login lockout for 3 seconds.");
-	return 0;
+        char buf[50];
+        snprintf(buf, 50, "Login lockour for %zu seconds.",
+                             player->auth.locked_until - time(NULL));
+        render_login_warning(player,buf);
+        return 0;
     }
         
+    
     struct login_attempt *attempt = (struct login_attempt*) reqbuf;
+
     struct all_usr users = {0};
     struct usr_rec usr = new_usr_rec();
     struct usr_rec cur = new_usr_rec();
@@ -1214,9 +1258,9 @@ int try_login(struct player *player, u8 *reqbuf) {
     memcpy(password, attempt->password.val, attempt->password.len);
 
     snv_name(username, usr.uname);
-    read_usr_all(db, &users);
 
-    /* fill in the inforamtion */
+    /* search db for user */
+    read_usr_all(db, &users);
     for (int i = 0; i < users.len; i++ ) {
         cur = users.rec[i];
         if(strcmp(usr.uname, cur.uname ) == 0) {
@@ -1232,97 +1276,81 @@ int try_login(struct player *player, u8 *reqbuf) {
         player->auth.id = usr.id;
         strcpy(player->auth.uname, usr.uname);
         player->auth.locked_until = 0;
-	return 1;
+        return 1;
     } else {
         player->auth.attempts++;
-        printf("failed\n");
-	return 0;
-    }
 
-    /* Verify both input fields were submitted.. */
-    if (attempt->head.nFields < 2) {
-        player->auth.attempts++;
-        render_login_warning(player, "All fields required.");
+        if (player->auth.attempts == 3) {
+            player->auth.locked_until = (time(NULL) + 5);
+            render_login_warning(player, "Login lockout for 5 seconds.");
+            player->auth.attempts = 0;
+            return 0;
+        }
+        
+        if (attempt->head.nFields < 2) {
+            render_login_warning(player, "All fields required.");
+        } else {
+            render_login_warning(player, "Invalid Credentials. plase try again");
+        }
+        
         return 0;
-    }
+        }
 }
 
 
-/* array of handler functions to handle interactions with screens indexed by scrid */
-/* array of render functions to render screens indexed by scrid */
-/* 2d navigation array 2 lookup and assign next screen based on return value of handler func */
-
-#if 0
-/* every screen gets a handler */
-int scr_handler_main_menu(struct player *player, u8 Aidkey, u8 *inputs) {
-    // extract AIDkey
-    // extract inputs/if necessary
-    // if errors render errors.
-    // handle keys
-    // return outcomes
-}
-#endif
 
 
-#if 0
+
 /* variable outcomes */
-const u8 navigation_routing_table[][32] = {
-    [MAIN_SCREEN] = {
-        [OUTCOME_GOTO_ADD_USER] = SCR_ADD_USER_FORM,
-        [OUTCOME_GOTO_VESSELS]  = SCR_VESSEL_ENTRY,
-        [OUTCOME_GOTO_REPORTS]  = SCR_REPORTS_MENU
+const u8 screen_router[][32] = {
+    [SCRID_NO_SCREEN] = {
+        [H_NO_SCR_WEB_LOGIN] = SCRID_LOGIN_SCREEN,
+        [H_NO_SCR_MOBILE_ACTIVATE] = SCRID_M_ACT_SCREEN
     },
-    
-    [LOGIN_SCREEN] = {
-        [OUTCOME_SUCCESS]       = SCR_MAIN_MENU, // Saved -> back to menu
-        [OUTCOME_LOGOUT]        = SCR_MAIN_MENU  // Pressed Esc -> back to menu
+    [SCRID_LOGIN_SCREEN] = {
+        [H_LOGIN_SCR_SUCCESS]  = SCRID_MAIN_SCREEN,
+        // NOTE: failed login return H_NO_ACTION from handler
     }
+    
+    /* [SCRID_MAIN_SCREEN] = { */
+    /*     [OUTCOME_GOTO_ADD_USER] = SCR_ADD_USER_FORM, */
+    /*     [OUTCOME_GOTO_VESSELS]  = SCR_VESSEL_ENTRY, */
+    /*     [OUTCOME_GOTO_REPORTS]  = SCR_REPORTS_MENU */
+    /* }, */
 };
-#endif
 
 
-/* Dispatch Business Logic */
+/* Dispatch Busines Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
     (void) reqbuflen;
 
+    
     struct player *player = NULL;
+    u32 nxt_screen, handler_res;
+
+    
     HASH_FIND_PTR(players, &c, player);
 
-    /* Player is not yet added to the world.  Add player to the world and send initial login screen. */
-    if (!player) {
+    if(!player) {
         player = onboard_new_player(c);
-        if(reqbuf[0] == 0x88) {
-            goto_login_screen(player);
-        }
-        else if (reqbuf[0] == 0x89) {
-            goto_m_activate_screen(player);
-        }
+    };
 
-    } 	/* Player is in the world.  The cases are responses to MAIN_SCREEN_ID*/ else {
-        
-        switch(player->scrid) {
-        case SCRID_M_ACT_SCREEN:
-            {
-                goto_m_activate_screen(player);
-            } break;
-        case SCRID_LOGIN_SCREEN:         
-            {
-		if (try_login(player,reqbuf)) {
-		    switch (player->auth.role) {
-		    default : goto_main_screen(player); break;
-		    }
-		} else {
-		    break;
-		}
-            } break;
-	case SCRID_MAIN_SCREEN:
-	    {
-		//get_next_screen(player)
-		//get_AID_KEY();
-		goto_main_screen(player);
-	    } break;
+    /* array of handler functions */
+    handler_res = screen_handlers[player->scrid](player, reqbuf);
+    
+    if (handler_res != H_NO_ACTION) {
+        nxt_screen = screen_router[player->scrid][handler_res];
+        set_live_screen(player, nxt_screen);
+
+        /* Some screens have customizations to the templates,
+         * if they do call the customizer function here. */
+        if (screen_renderers[player->scrid]) {
+            screen_renderers[player->scrid](player);
         }
+        
+        mb_send(player);
     }
+    
 }
 
 /* ===========================================================================
@@ -1695,3 +1723,7 @@ update screen
          Header:           |   opcode u8  |  aidkey u8   | nFields u8    |
          Field blocks:     | field_id  u8 |  fldlen u8   | field_val 24 |
 ---------------------------------------------------------------------------------- */
+
+/* array of handler functions to handle interactions with screens indexed by scrid */
+/* array of render functions to render screens indexed by scrid */
+/* 2d navigation array 2 lookup and assign next screen based on return value of handler func */
