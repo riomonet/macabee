@@ -103,4 +103,43 @@ enum AID_KEYS {
     ENTER = 0xFF
 };
 
+
+/* def_screen */
+struct screen {
+    u8 op_A;
+    u8 op_B;
+    u8 ic;
+    size_t nFields;
+    struct field_layout *layout;
+    struct field_state *state;
+};
+
+struct live_screen {
+    u8 op_A;
+    u8 op_B;
+    u8 ic;
+    size_t nFields;
+    struct field_layout layout[100];
+    struct field_state state[100];
+};
+
+/* def_player */
+struct player {
+    struct mg_connection *c;
+    UT_hash_handle hh;
+    u8 scrid;
+    u8 scrat;
+    struct live_screen scr;
+    struct auth {
+        time_t logintim;
+        u8 attempts;
+        u8 role;
+        u16 id;
+        char uname[25];
+        time_t locked_until;
+    } auth;
+};
+
+
+
 #endif

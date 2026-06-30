@@ -9,11 +9,11 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "mac_types.h"
+#include "uthash.h"
 #include "mongoose.h"
 #include "sqlite3.h"
 #include "cJSON.h"
-#include "uthash.h"
+#include "mac_types.h"
 
 #define DEV_MODE 1
 #define DB_RESET 0
@@ -86,7 +86,7 @@ enum ROLES {
 
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
-struct player;
+
 typedef int (*screen_handler)(struct player *, u8 *);
 typedef void(*screen_renderer)(struct player *);
 
@@ -94,6 +94,11 @@ typedef void(*screen_renderer)(struct player *);
     YMB(LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
     YMB(MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
     YMB(M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
+    YMB(MENU_TEMPLATE, menu_template,IC_NONE)   
+
+#define SCREEN_TEMPLATES                        \
+    YMB(MENU_TEMPLATE, menu_template,IC_NONE)   
+
 
 /* ENUM FOR SCRID, SCRID_NO_SCREEN is screen 0 */
 #define YMB(SCR,scr,IC) SCRID_##SCR,
@@ -110,9 +115,9 @@ SCREENS_LIST
 
 /* Function prototypes for renderers */
 #define YMB(scrid, name, select)                \
-    void renderer_##name(u8);
+    void renderer_##name(struct player *p);
 
-void renderer_no_screen(u8);
+void renderer_no_screen(struct player *p);
 SCREENS_LIST
 #undef YMB
 
@@ -126,6 +131,7 @@ screen_handler screen_handlers[] = {
 };
 #undef YMB
 
+/* array of renderers */
 #define YMB(scrid, name, select)                \
     [SCRID_##scrid] = NULL,
 
@@ -135,9 +141,7 @@ screen_renderer screen_renderers[] ={
 };
 #undef YMB
 
-enum H_MAIN_SCREEN {
-    H_MAIN_LOGOUT
-};
+
 
 /* HANDLERS AND RENDERERS */
 
@@ -149,7 +153,6 @@ enum H_NO_SCREEN {
 };
 
 int handler_no_screen(struct player *p, u8 *reqbuf) {
-
 
     (void) p;
     int Op_A = reqbuf[0];
@@ -167,9 +170,28 @@ int handler_no_screen(struct player *p, u8 *reqbuf) {
 
 /*______________________________MAIN SCREEN__________________________ */
 
+int handler_menu_template(struct player *p , u8 *reqbuf) {
+    (void)    p;
+    (void)    reqbuf;
+    return 0;
+}
+
+
+void renderer_menu_template(struct player *p) {
+    char *r[] = {
+        "ari", "safari", "zoo"
+    };
+}
+
+enum H_MAIN_SCREEN {
+    H_MAIN_LOGOUT
+};
+
 
 int handler_main_screen(struct player *p , u8 *reqbuf) {
-    (void) p;
+
+    p->scrat = 1;
+    //    (void) p;
     (void) reqbuf;
     #if 0
     int k = get_aid_key(reqbuf);
@@ -183,6 +205,12 @@ int handler_main_screen(struct player *p , u8 *reqbuf) {
     return H_NO_ACTION;
 }
 
+void renderer_main_screen(struct player *p) {
+    (void)p;
+        
+}
+    
+
 /*______________________________LOGIN SCREEN__________________________ */
 enum H_LOGIN_SCREEN {
     H_LOGIN_SCR_SUCCESS,
@@ -192,7 +220,6 @@ int handler_login_screen(struct player *p, u8 *reqbuf) {
     if (try_login(p,reqbuf)) {
         return H_LOGIN_SCR_SUCCESS;
     }
-    
     return H_NO_ACTION;
 }
 
@@ -203,14 +230,12 @@ enum H_M_ACT_SCREEN {
     RC_HANDLER_M_ACT_LOGOUT
 };
 
-
 /* MOBILE HANDLERS AND RENDERERS */
 int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     (void) p;
     (void) reqbuf;
      return 1;
 }
-
 
 /* SCREEN STUBS */
 #define SCREEN_STUB_HEADER(SCR,title)                                   \
@@ -220,15 +245,15 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     LABEL(SCR##_FLD_TITLE,1,29,21, title)                               \
     LABEL_FC(SCR##_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
-#define SCREEN_STUB_FOOTER(SCR)                     \
-    LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")	\
-    LABEL(SCR##FLD_ARROW,24,1,4, "-->")             \
-    HL(SCR##_FLD_HL1,26,1,100)                      \
-    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT, CYAN)   \
-    LABEL(SCR##_FLD_F2,28,19,9, "")                 \
-    LABEL(SCR##_FLD_F3,28,31,16,"")                 \
-    HL(SCR##_FLD_HL2,29,0,100)                      \
-    HL(SCR##_FLD_HL3,24,7,90)                       \
+#define SCREEN_STUB_FOOTER(SCR)                             \
+    LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
+    LABEL(SCR##FLD_ARROW,24,1,4, "-->")                     \
+    HL(SCR##_FLD_HL1,26,1,100)                              \
+    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT, CYAN)  \
+    LABEL(SCR##_FLD_F2,28,19,9, "")                         \
+    LABEL(SCR##_FLD_F3,28,31,16,"")                         \
+    HL(SCR##_FLD_HL2,29,0,100)                              \
+    HL(SCR##_FLD_HL3,24,7,90)                               \
     INPUT(SCR##_ISELECT,24,6,1)
 
 
@@ -254,13 +279,27 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     SCREEN_STUB_FOOTER(MAIN)
 
 
+#define MENU_TEMPLATE                           \
+    LABEL_F(MENU_1 , 8, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_2 ,10, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_3 ,12, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_4 ,14, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_5 ,16, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_6 ,18, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_7 ,20, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_8 ,22, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_9 ,24, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_10,26, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_11,28, 9, 27, "",HIDDEN)       \
+    LABEL_F(MENU_12,30, 9, 27, "",HIDDEN) 
+        
+
 #define MAIN_SCREEN_ALPHA                               \
     SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )    \
     LABEL(MAIN_L7,8,10,15,   "1. Send SMS invite")      \
     LABEL(MAIN_L8,9,10,15,   "2. Send email invite")    \
     LABEL(MAIN_L9,10,10,15,   "3. Add new contact")     \
     SCREEN_STUB_FOOTER(MAIN)
-
 
 #define ADD_NEW_USER                                                    \
     LABEL(ADD_USER_LAB_FIRST , 8 ,  9, 27, "FIRST NAME . . . . . . . . . . . ") \
@@ -360,31 +399,9 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
     return netscr;
 }
 
-/* def_screen */
-struct screen {
-    u8 op_A;
-    u8 op_B;
-    u8 ic;
-    size_t nFields;
-    struct field_layout *layout;
-    struct field_state *state;
-
-};
-
-struct live_screen {
-    u8 op_A;
-    u8 op_B;
-    u8 ic;
-    size_t nFields;
-    struct field_layout layout[100];
-    struct field_state state[100];
-};
-
-
 /* |--------------------------------------- GLOBAL SCREEN TEMPLATES -------------------------------- */
 
 /* Global Screen templates:  */
-
 
 #define YMB(SCR,scr,IC)	[SCRID_##SCR] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
 struct screen screens[] = {SCREENS_LIST};
@@ -392,22 +409,6 @@ struct screen screens[] = {SCREENS_LIST};
 
 
 /* ---------------------------- World state management ------------------------------------ */
-
-/* def_player */
-struct player {
-    struct mg_connection *c;
-    UT_hash_handle hh;
-    u8 scrid;
-    struct live_screen scr;
-    struct auth {
-        time_t logintim;
-        u8 attempts;
-        u8 role;
-        u16 id;
-        char uname[25];
-        time_t locked_until;
-    } auth;
-};
 
 /* 'players' is a pointer to a global hash table.  It is 
  * a container of 'player' who have connected. They are either 
@@ -420,6 +421,7 @@ struct player *onboard_new_player(struct mg_connection *c) {
     struct player *player = (struct player*) malloc(sizeof(*player));
     player->c = c;
     player->scrid = SCRID_NO_SCREEN;
+    player->scrat = 0;
     player->auth.logintim = 0;
     player->auth.attempts = 0;
     player->auth.role = 0;
@@ -452,9 +454,6 @@ void mb_send (struct player *player) {
 void set_field_text(struct screen *scr, int field, char *value) {
     strcpy(scr->state[field].text, value);
 }
-
-
-
  
 /* TODO: Make this more general, it should take a column color and text */
 void render_login_warning(struct player *player, char *txt) {
@@ -1157,7 +1156,6 @@ void set_live_screen(struct player *player, enum SCRID scrid) {
     memcpy(scr->state, tmpl.state, tmpl.nFields * sizeof(struct field_state));
 }
 
-
 void today(char *buf, int len) {
     time_t now = time(NULL);
     struct tm *tm = localtime(&now);
@@ -1296,9 +1294,6 @@ int try_login(struct player *player, u8 *reqbuf) {
         return 0;
         }
 }
-
-
-
 
 
 /* variable outcomes */
@@ -1598,8 +1593,6 @@ void require_root(sqlite3 *db) {
     printf("Macabee engaged, server started: \n\n");
     return;
 }
-
-
 
 int main(void) {
 
