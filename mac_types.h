@@ -17,6 +17,17 @@ typedef uint64_t u64;
 #define VIS_LINE  1 << 2
 #define MAX_FLD_SIZE 120
 
+
+#define DEV_MODE 1
+#define DB_RESET 0
+
+#define UID_NF UINT16_MAX // UID NOT FOUND. [SENTINEL]
+
+#define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
+#define STR2(X) #X
+#define STR(X) STR2(X)
+
+
 struct __attribute__((packed)) update_header {
     u8 opcode_a;
     u8 opcode_b;
@@ -114,6 +125,8 @@ struct screen {
     struct field_state *state;
 };
 
+
+/* live screen is the actual transmit screen */
 struct live_screen {
     u8 op_A;
     u8 op_B;
@@ -162,6 +175,13 @@ struct login_attempt {
     struct cfb password;
 };
 
+struct anc_form {
+    struct cfh head;
+    struct cfb first;
+    struct cfb last;
+    struct cfb email;
+    struct cfb phone;
+};
 
 
 

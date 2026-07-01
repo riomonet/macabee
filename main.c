@@ -14,12 +14,10 @@
 #include "sqlite3.h"
 #include "cJSON.h"
 #include "mac_types.h"
+#include "db_DSL.c"
 #include "mac_function_prototypes.h"
 
-#define DEV_MODE 1
-#define DB_RESET 0
 
-#define UID_NF UINT16_MAX // UID NOT FOUND. [SENTINEL]
 
 sqlite3 *db;
 
@@ -71,20 +69,6 @@ enum ROLES {
 
 #define STATE_LEN(id, txt, len, flg, col)       \
     X(id, txt, len, flg, col)
-
-#define MAX_SLOTS(arr) (sizeof(arr)/sizeof(arr[0]))
-#define STR2(X) #X
-#define STR(X) STR2(X)
-
-#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos, cnt) \
-    {                                                                   \
-    .op_A = (opA),                                                      \
-    .op_B = (opB),                                                      \
-    .layout = (layout_arr),                                             \
-    .state = (state_arr),                                               \
-    .nFields = cnt,                                                     \
-    .ic = (cursor_pos)                                                  \
-    }
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
@@ -139,112 +123,6 @@ screen_renderer screen_renderers[] ={
 };
 #undef YMB
 
-/* HANDLERS AND RENDERERS */
-
-#define H_NO_ACTION 0xFFFFFFFFu
-
-enum H_NO_SCREEN {
-    H_NO_SCR_WEB_LOGIN,
-    H_NO_SCR_MOBILE_ACTIVATE
-};
-
-int handler_no_screen(struct player *p, u8 *reqbuf) {
-
-    (void) p;
-    int Op_A = reqbuf[0];
-    /* web user */
-    if(Op_A == 0x88) {
-        return H_NO_SCR_WEB_LOGIN;
-    }
-    
-    /* mobile user */
-    else if (Op_A == 0x89) {
-        return H_NO_SCR_MOBILE_ACTIVATE;
-    }
-    return H_NO_ACTION;
-}
-
-/*______________________________MAIN SCREEN__________________________ */
-
-
-enum H_MAIN_SCREEN {
-    H_MAIN_SCR_LOGOUT,
-    H_MAIN_SCR_ANC
-};
-
-int handler_main_screen(struct player *p , u8 *reqbuf) {
-    (void) p;
-
-    int k = reqbuf[1];
-    switch(k) {
-
-    case F2: {
-        logout_player(p);
-        return H_MAIN_SCR_LOGOUT;
-    }
-    case F6: break;
-    case ENTER:
-        if(reqbuf[5] == '1') {
-            return H_MAIN_SCR_ANC;
-        } break;
-    }
-    return H_NO_ACTION;
-}
-    
-
-
-enum H_ANC_SCREEN {
-    H_ANC_SCR_LOGOUT,
-    H_ANC_SCR_MAIN
-};
-
-int handler_anc_screen(struct player *p , u8 *reqbuf) {
-    int k = reqbuf[1];
-    switch(k) {
-    case F2: {
-        logout_player(p);
-        return H_ANC_SCR_LOGOUT;
-    }
-    case F8: {
-        return H_ANC_SCR_MAIN;
-    }
-    case ENTER:
-        return H_NO_ACTION; // NOTE:temp
-        // snv items
-        // show confirmation screen
-        // confirm add and goto main menu
-    default:
-        return H_NO_ACTION;
-    }
-    return 0;
-}
-
-
-/*______________________________LOGIN SCREEN__________________________ */
-enum H_LOGIN_SCREEN {
-    H_LOGIN_SCR_SUCCESS,
-};
-int try_login(struct player *, u8 *);
-int handler_login_screen(struct player *p, u8 *reqbuf) {
-    if (try_login(p,reqbuf)) {
-        return H_LOGIN_SCR_SUCCESS;
-    }
-    return H_NO_ACTION;
-}
-
-/*______________________________END LOGIN SCREEN__________________________ */
-
-
-enum H_M_ACT_SCREEN {
-    RC_HANDLER_M_ACT_LOGOUT
-};
-
-/* MOBILE HANDLERS AND RENDERERS */
-int handler_m_act_screen(struct player *p, u8 *reqbuf) {
-    (void) p;
-    (void) reqbuf;
-     return 1;
-}
 
 /* SCREEN STUBS */
 #define SCREEN_STUB_HEADER(SCR,title)                                   \
@@ -269,6 +147,7 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
 #define NO_SCREEN NULL
 #define IC_NONE -1
 
+/* TODO: Fix INVERSE FLAG */
 /* LOGIN SCREEN row, col */
 #define LOGIN_SCREEN                                                    \
     LABEL(LOGIN_L1       , 8,   9, 27, "USER . . . . . . . . . . . ")   \
@@ -276,7 +155,7 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     INPUT(LOGIN_IUSER    , 8,  38, 24)                                  \
     INPUT_F(LOGIN_IPW    , 10, 38, 24,  PASSWORD)                       \
     LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
-    LABEL_C(LOGIN_L4     , 1,  40, 19, "Marina 59 | Sign On", WHITE)    \
+    LABEL(LOGIN_L4     , 1,  40, 19, "Marina 59 | Sign On")          \
     STATUS(LOGIN_WARNING , 12, 38, 42, "", HIDDEN)                      
 
 /*   id, col, row, width */
@@ -287,7 +166,6 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     LABEL(MAIN_L7,8,10,21,   "1. Add new customer.")                \
     SCREEN_STUB_FOOTER(MAIN)
 
-
 #define ANC_SCREEN                                                      \
     LABEL(ANC_L1       , 8,   9, 27, "FIRST  . . . . . . . . . . . ")   \
     LABEL(ANC_L2       , 10,  9, 27, "LAST   . . . . . . . . . . . ")   \
@@ -297,13 +175,13 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     INPUT(ANC_LAST      ,10, 38, 24)                                    \
     INPUT(ANC_EMAIL    , 12, 38, 24)                                    \
     INPUT(ANC_PHONE    , 14, 38, 24)                                    \
-    LABEL_FC(ANC_INST    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
+    LABEL_FC(ANC_INST   , 5,  5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
     LABEL_C(ANC_TITLE     , 1,  40, 19, "Marina 59 | Add new customer", WHITE) \
-    STATUS(ANC_WARNING , 12, 38, 42, "", HIDDEN)                        \
+    STATUS(ANC_WARNING , 16, 38, 42, "", HIDDEN)                        \
     HL(ANC_HL1,26,1,100)                                                \
     LABEL_FC(ANC_F1,28,6,9,"F2=Logout", FAINT, CYAN)                    \
     LABEL_FC(ANC_F2,28,19,20,"F8=Back to Main Menu",FAINT, CYAN )       \
-    HL(ANC_HL2,29,1,100)                          
+    HL(ANC_HL2,29,1,100)                                                \
 
 
 #define MAIN_SCREEN_ALPHA                               \
@@ -366,19 +244,191 @@ SCREENS_LIST
 #undef YMB
 
 
+/* ------------------- LOOKUP TABLE OF SCREEN TEMPLATES ------------------ */
+
+#define MAKE_SCREEN_DEF(opA, opB, layout_arr, state_arr, cursor_pos, cnt) \
+    {                                                                   \
+    .op_A = (opA),                                                      \
+    .op_B = (opB),                                                      \
+    .layout = (layout_arr),                                             \
+    .state = (state_arr),                                               \
+    .nFields = cnt,                                                     \
+    .ic = (cursor_pos)                                                  \
+    }
+
+
+#define YMB(SCR,scr,IC)	[SCRID_##SCR] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
+struct screen screens[] = {SCREENS_LIST};
+#undef YMB
+
+/* ------------------------------------------------------------------------ */
+/*========================= FIELD MANIPULATION FUNCTIONS=================== */
+/* ------------------------------------------------------------------------ */
+
+
+
+
+
+
+
+
+
+/* ------------------------------------------------------------------------ */
+/*========================= HANDLERS AND RENDERERS =========================*/
+/* ------------------------------------------------------------------------ */
+
+
+/* Global Handler Return Code */
+#define H_NO_ACTION 0xFFFFFFFFu
+
+enum H_NO_SCREEN {
+    H_NO_SCR_WEB_LOGIN,
+    H_NO_SCR_MOBILE_ACTIVATE
+};
+
+int handler_no_screen(struct player *p, u8 *reqbuf) {
+
+    (void) p;
+    int Op_A = reqbuf[0];
+    /* web user */
+    if(Op_A == 0x88) {
+        return H_NO_SCR_WEB_LOGIN;
+    }
+    
+    /* mobile user */
+    else if (Op_A == 0x89) {
+        return H_NO_SCR_MOBILE_ACTIVATE;
+    }
+    return H_NO_ACTION;
+}
+
+/*______________________________MAIN SCREEN__________________________ */
+
+/* RETURN CODES MAIN SCREEN HANLDER */
+enum H_MAIN_SCREEN {
+    H_MAIN_SCR_LOGOUT,
+    H_MAIN_SCR_ANC
+};
+
+/* MAIN SCREEN HANDLER */
+int handler_main_screen(struct player *p , u8 *reqbuf) {
+    (void) p;
+
+    int k = reqbuf[1];
+    switch(k) {
+
+    case F2: {
+        logout_player(p);
+        return H_MAIN_SCR_LOGOUT;
+    }
+    case F6: break;
+    case ENTER:
+        if(reqbuf[5] == '1') {
+            return H_MAIN_SCR_ANC;
+        } break;
+    }
+    return H_NO_ACTION;
+}
+
+/* MAIN SCREEN RENDERER */
 void renderer_main_screen(struct player *player) {
     char user[32];                                     
     snprintf(user, 32, "user: %s", player->auth.uname);
-    set_screen_text(player,MAIN_SCREEN_FLD_USER, user);  
+    //    set_screen_text(player,MAIN_SCREEN_FLD_USER, user);  
     char date[32];					
     today(date, sizeof(date));		
-    set_screen_text(player,MAIN_SCREEN_FLD_DATE, date);
+    //    set_screen_text(player,MAIN_SCREEN_FLD_DATE, date);
 }
+
+
+/*___________________ADD NEW CUSTOMER SCREEN__________________________ */
+
+enum H_ANC_SCREEN {
+    H_ANC_SCR_LOGOUT,
+    H_ANC_SCR_MAIN
+};
+
+
+int handler_anc_screen(struct player *player , u8 *reqbuf) {
+    int k = reqbuf[1];
+    switch(k) {
+    case F2: {
+        logout_player(player);
+        return H_ANC_SCR_LOGOUT;
+    }
+    case F8: {
+        return H_ANC_SCR_MAIN;
+    }
+    case ENTER:
+        struct anc_form *form = (struct anc_form*) reqbuf;
+        if (form->head.nFields < 4) {
+            /* TODO: generalize all fields required as a func
+             * you pass in the field_name and player */
+            
+            struct field_state buf[1];
+            buf[0] = field_copy(anc_screen_state[ANC_WARNING]);
+            field_unhide(&buf[0]);
+            field_set_text(&buf[0], "All fields required");
+            field_set_color(&buf[0], BROWN);
+            mb_send_update(player, 1, buf, player->scr.ic);
+            return H_NO_ACTION; 
+        } else {
+            struct usr_rec usr;
+            char first[NAME_T] = {0};
+            snv_name(first, usr.first);
+            printf("HELLO %s\n",first);
+            return H_NO_ACTION; // NOTE:temp
+        }
+        //check first and last names
+        // check email make sure structure and not already in the db
+        // check phone
+        
+
+
+        // snv items
+        // show confirmation screen
+        // confirm add and goto main menu
+    default:
+        return H_NO_ACTION;
+    }
+    return 0;
+}
+
+/*______________________________LOGIN SCREEN__________________________ */
+
+enum H_LOGIN_SCREEN {
+    H_LOGIN_SCR_SUCCESS,
+};
+
+int handler_login_screen(struct player *p, u8 *reqbuf) {
+    if (try_login(p,reqbuf)) {
+        return H_LOGIN_SCR_SUCCESS;
+    }
+    return H_NO_ACTION;
+}
+
+/*______________________________MOBILE ACTIVATION__________________________ */
+
+
+enum H_M_ACT_SCREEN {
+    RC_HANDLER_M_ACT_LOGOUT
+};
+
+/* MOBILE HANDLERS AND RENDERERS */
+int handler_m_act_screen(struct player *p, u8 *reqbuf) {
+    (void) p;
+    (void) reqbuf;
+     return 1;
+}
+
+/* -----------------------------END SCREEN HANDLERS AND RENDERERS---------- */
 
 
 void init_screen_renderers() {
     screen_renderers[SCRID_MAIN_SCREEN] = renderer_main_screen;
 }
+
+/* ------------------------------------------------------------------------ */
 
 struct net_payload_screen {
     int id;
@@ -426,13 +476,6 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
     return netscr;
 }
 
-/* |--------------------------------------- GLOBAL SCREEN TEMPLATES -------------------------------- */
-
-/* Global Screen templates:  */
-
-#define YMB(SCR,scr,IC)	[SCRID_##SCR] = MAKE_SCREEN_DEF(OP_A_NEW, OP_B_DEF, scr##_layout, scr##_state, IC, SCR##_FIELD_COUNT),
-struct screen screens[] = {SCREENS_LIST};
-#undef YMB
 
 
 /* ---------------------------- World state management ------------------------------------ */
@@ -489,32 +532,52 @@ void mb_send (struct player *player) {
 
 /* ----------------------------- Render functions ------------------------------------------------------------------- */
 
-void set_field_text(struct screen *scr, int field, char *value) {
-    strcpy(scr->state[field].text, value);
+struct field_state field_copy(struct field_state old)  {
+    struct field_state new = old;
+    return new;
 }
- 
-/* TODO: Make this more general, it should take a column color and text */
-void render_login_warning(struct player *player, char *txt) {
 
-    struct field_state buf[1];
-
-    player->scr.op_A = OP_A_UPDATE;
+/* Pass an array of field_states to be sent to client player */
+void mb_send_update(struct player *player, int nFields, struct field_state *buf, int ic) {
+    player->scr.op_A = OP_A_UPDATE; 
     player->scr.op_B = OP_B_DEF;
-    player->scr.ic = LOGIN_IUSER;
-    player->scr.nFields = MAX_SLOTS(buf);
-        
-    struct field_state f = login_screen_state[LOGIN_WARNING];
-    f.fg_color = BROWN;
-    //f.bg_color = GREEN;
-    f.flags &= ~HIDDEN;
-    strcpy(f.text, txt);
-    f.text_len = strlen(f.text);
-    
-    buf[0] = f;
-    memcpy(player->scr.state,buf, sizeof(*buf)) ;
+    player->scr.ic = ic;
+    player->scr.nFields = nFields;
+
+    int len = nFields * sizeof(struct field_state);
+    memcpy(player->scr.state,buf, len);
     mb_send(player);
 }
 
+/* TODO: Make this more general, it should take a column color and text */
+void render_login_warning(struct player *player, char *txt) {
+
+    struct field_state buf[1];  /* new blank field(s) */
+
+    /* set up the transmit_scr for update */
+    player->scr.op_A = OP_A_UPDATE; 
+    player->scr.op_B = OP_B_DEF;
+    player->scr.ic = LOGIN_IUSER;
+    player->scr.nFields = MAX_SLOTS(buf);
+
+    /* copy the field(s) you want to change */
+    buf[0] = login_screen_state[LOGIN_WARNING];
+
+    /* set teh values you want to change  */
+    buf[0].fg_color = BROWN;
+    //f.bg_color = GREEN;
+    buf[0].flags &= ~HIDDEN;
+    strcpy(buf[0].text, txt);
+    buf[0].text_len = strlen(txt);
+
+    /* copy the new state array to the live transmit buffer  */
+    memcpy(player->scr.state,buf, sizeof(*buf)) ;
+
+    /* blit to screen */
+    mb_send(player);
+}
+
+#if 0
 /* ============================================================================
               DATABASE TABLE AND CRUD MACROS GENERATION SYSTEM (TCGS)
 =============================================================================== */
@@ -1044,6 +1107,8 @@ void view_users_test(sqlite3 *db) {
 /* ============================     END DB          ============================================= */
 
 /* ============================== SANITIZE,NORMALIZE, VALIDATE ================================= */
+#endif
+
 
 int snv_email(char *email, char *cln) {
 
@@ -1175,43 +1240,26 @@ void time_now(char *buf, int len) {
     strftime(buf, len, "%H:%M:%S", tm);
 }
     
-
-
-void set_screen_flags(struct player *player, int col, u8 flags) {
-    player->scr.state[col].flags = flags;
- 
+void field_set_flags(struct field_state *fs, u8 flags) {
+    fs->flags = flags;
 }
 
-void set_screen_unhide(struct player *player, int col) {
-    player->scr.state[col].flags &= ~HIDDEN;
-
+void field_unhide(struct field_state *fs) {
+    fs->flags &= ~HIDDEN;
 }
 
-void set_screen_hide(struct player *player, int col) {
-    player->scr.state[col].flags |= HIDDEN;
+void field_hide(struct field_state *fs) {
+    fs->flags |= HIDDEN;
 }
 
-void set_screen_text(struct player *player, int col, char *txt) {
-    player->scr.state[col].text_len = strlen(txt);
-    strcpy(player->scr.state[col].text, txt);
-}
-void set_screen_color(struct player *player, int col, enum colors color) {
-    player->scr.state[col].fg_color = color;
+void field_set_text(struct field_state *fs, char *txt) {
+    fs->text_len = strlen(txt);
+    strcpy(fs->text, txt);
 }
 
-
-/* On  update just send the correct opcdoe and thee  */
-void mb_update(struct player *player, int nFields, int IC, struct field_state *update) {
-
-    player->scr.op_A = OP_A_UPDATE;
-    player->scr.op_B = OP_B_DEF;
-    player->scr.ic = IC;
-    player->scr.nFields = nFields;
-    memset(player->scr.state,0,100*sizeof(struct field_state));
-    memcpy(player->scr.state,update,nFields*sizeof(struct field_state));
-    mb_send(player);
+void field_set_color(struct field_state *fs, enum colors color) {
+    fs->fg_color = color;
 }
-
 
 void tick(char *time) {
     struct player *p = players;
@@ -1220,7 +1268,7 @@ void tick(char *time) {
             struct field_state f[] = {main_screen_state[MAIN_SCREEN_FLD_TIME]};
             f[0].text_len = strlen(time);
     strcpy(f[0].text, time);
-            mb_update(p,1,MAIN_ISELECT,f);
+    mb_send_update(p,1,f, MAIN_ISELECT);
         }
     }
 }
@@ -1326,7 +1374,6 @@ const u8 screen_router[][32] = {
 /* Dispatch Busines Logic */
 void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
     (void) reqbuflen;
-
     
     struct player *player = NULL;
     u32 nxt_screen, handler_res;
@@ -1341,7 +1388,7 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
     /* array of handler functions */
     handler_res = screen_handlers[player->scrid](player, reqbuf);
     
-    if (handler_res != H_NO_ACTION) {
+    if (handler_res != H_NO_ACTION) { 
         nxt_screen = screen_router[player->scrid][handler_res];
         set_live_screen(player, nxt_screen);
 
@@ -1353,7 +1400,6 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
         
         mb_send(player);
     }
-    
 }
 
 /* ===========================================================================
