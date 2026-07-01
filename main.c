@@ -257,12 +257,12 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
 #define SCREEN_STUB_FOOTER(SCR)                             \
     LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
     LABEL(SCR##FLD_ARROW,24,1,4, "-->")                     \
-    HL(SCR##_FLD_HL1,26,1,100)                              \
-    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT , CYAN)  \
+    HL(SCR##_FLD_HL1,26,1,91)                              \
+    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT,CYAN)  \
     LABEL(SCR##_FLD_F2,28,19,9, "")                         \
     LABEL(SCR##_FLD_F3,28,31,16,"")                         \
-    HL(SCR##_FLD_HL2,29,0,100)                              \
-    HL(SCR##_FLD_HL3,24,7,90)                               \
+    HL(SCR##_FLD_HL2,29,0,92)                              \
+    HL(SCR##_FLD_HL3,24,7,85)                               \
     INPUT(SCR##_ISELECT,24,6,1)
 
 
@@ -304,8 +304,6 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     LABEL_FC(ANC_F1,28,6,9,"F2=Logout", FAINT, CYAN)                    \
     LABEL_FC(ANC_F2,28,19,20,"F8=Back to Main Menu",FAINT, CYAN )       \
     HL(ANC_HL2,29,1,100)                          
-
-    
 
 
 #define MAIN_SCREEN_ALPHA                               \
@@ -366,6 +364,21 @@ SCREENS_LIST
 SCREENS_LIST
 #undef X
 #undef YMB
+
+
+void renderer_main_screen(struct player *player) {
+    char user[32];                                     
+    snprintf(user, 32, "user: %s", player->auth.uname);
+    set_screen_text(player,MAIN_SCREEN_FLD_USER, user);  
+    char date[32];					
+    today(date, sizeof(date));		
+    set_screen_text(player,MAIN_SCREEN_FLD_DATE, date);
+}
+
+
+void init_screen_renderers() {
+    screen_renderers[SCRID_MAIN_SCREEN] = renderer_main_screen;
+}
 
 struct net_payload_screen {
     int id;
@@ -1162,23 +1175,28 @@ void time_now(char *buf, int len) {
     strftime(buf, len, "%H:%M:%S", tm);
 }
     
+
+
+void set_screen_flags(struct player *player, int col, u8 flags) {
+    player->scr.state[col].flags = flags;
+ 
+}
+
+void set_screen_unhide(struct player *player, int col) {
+    player->scr.state[col].flags &= ~HIDDEN;
+
+}
+
+void set_screen_hide(struct player *player, int col) {
+    player->scr.state[col].flags |= HIDDEN;
+}
+
 void set_screen_text(struct player *player, int col, char *txt) {
     player->scr.state[col].text_len = strlen(txt);
     strcpy(player->scr.state[col].text, txt);
 }
-
-#define TITLE_BAR(SCR)					\
-    char user[32];					\
-    snprintf(user, 32, "user: %s", player->auth.uname);	\
-    set_screen_text(player,SCR##_FLD_USER, user);	\
-    char date[32];					\
-    today(date, sizeof(date));				\
-    set_screen_text(player,SCR##_FLD_DATE, date);
-
-void goto_main_screen(struct player *player) {
-    set_live_screen(player, SCRID_MAIN_SCREEN);
-    TITLE_BAR(MAIN_SCREEN)
-    mb_send(player);    
+void set_screen_color(struct player *player, int col, enum colors color) {
+    player->scr.state[col].fg_color = color;
 }
 
 
@@ -1207,13 +1225,7 @@ void tick(char *time) {
     }
 }
 
-void goto_main_screen_alpha(struct player *player) {
-    set_live_screen(player, SCRID_MAIN_SCREEN);
-    // set user name
-    // set date
-    // set time with seconds.....
-    mb_send(player);    
-}
+
 
 int try_activate(struct player *player,u8 *reqbuf) {
     (void) player;
@@ -1594,7 +1606,7 @@ int main(void) {
 
     db = init_db();
     create_tables(db);
-    
+    init_screen_renderers();
 #if DEV_MODE == 0
     printf("DEV_MODE NOT");
     require_root(db);
