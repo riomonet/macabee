@@ -258,7 +258,7 @@ int handler_m_act_screen(struct player *p, u8 *reqbuf) {
     LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
     LABEL(SCR##FLD_ARROW,24,1,4, "-->")                     \
     HL(SCR##_FLD_HL1,26,1,100)                              \
-    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT, CYAN)  \
+    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT , CYAN)  \
     LABEL(SCR##_FLD_F2,28,19,9, "")                         \
     LABEL(SCR##_FLD_F3,28,31,16,"")                         \
     HL(SCR##_FLD_HL2,29,0,100)                              \
