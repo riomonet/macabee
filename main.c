@@ -180,8 +180,6 @@ screen_renderer screen_renderers[] ={
 #undef YMB
 
 
-
-
 #define NO_SCREEN NULL
 #define IC_NONE -1
 
