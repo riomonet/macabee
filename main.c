@@ -17,24 +17,19 @@
 #include "db_DSL.c"
 #include "mac_function_prototypes.h"
 
-
-
 sqlite3 *db;
 
-/* Role values must be explictly defined or db values will no align. */
-enum ROLES {
-    ROLE_NONE = 0,
-    ROLE_ALPHA = 1,
-    ROLE_OFFICE = 2,
-    ROLE_YARD = 3,
-    ROLE_ACCOUNTING = 4,
-  };
 
 /* ============================================================================
               SCREEN MACROS SYSTEM (DSL)
 =============================================================================== */
 
 /* ---------------------------- screen definitions ------------------------------------------------------------------- */
+#define SCREENS_LIST                                \
+    YMB(LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
+    YMB(MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
+    YMB(M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
+    YMB(ANC_SCREEN, anc_screen, ANC_FIRST)
 
 
 #define LABEL(id, yy, xx, ww, txt)                                  \
@@ -74,13 +69,6 @@ enum ROLES {
 
 typedef int (*screen_handler)(struct player *, u8 *);
 typedef void(*screen_renderer)(struct player *);
-
-#define SCREENS_LIST                                \
-    YMB(LOGIN_SCREEN, login_screen, LOGIN_IUSER)   \
-    YMB(MAIN_SCREEN, main_screen, MAIN_ISELECT)    \
-    YMB(M_ACT_SCREEN, m_act_screen, M_ACT_CODE)    \
-    YMB(ANC_SCREEN, anc_screen, ANC_FIRST)
-
 
 /* ENUM FOR SCRID, SCRID_NO_SCREEN is screen 0 */
 #define YMB(SCR,scr,IC) SCRID_##SCR,
@@ -220,7 +208,9 @@ screen_renderer screen_renderers[] ={
 // 45 wide y range is 5-59 x range is 1-45
 
 
-/* -------------------------------------------- END SCREEN DEFIvNTIONS --------------------------------------------- */
+/* -------------------------------------------- END SCREEN DEFINTIONS --------------------------------------------- */
+
+
 #define X(id, t, x, y, w, txt, len, flg, col,r1,r2,r3) id,
 #define YMB(SCR,scr, IC) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
 SCREENS_LIST
@@ -264,8 +254,6 @@ struct screen screens[] = {SCREENS_LIST};
 /* ------------------------------------------------------------------------ */
 /*========================= FIELD MANIPULATION FUNCTIONS=================== */
 /* ------------------------------------------------------------------------ */
-
-
 
 
 
@@ -334,10 +322,10 @@ int handler_main_screen(struct player *p , u8 *reqbuf) {
 void renderer_main_screen(struct player *player) {
     char user[32];                                     
     snprintf(user, 32, "user: %s", player->auth.uname);
-    //    set_screen_text(player,MAIN_SCREEN_FLD_USER, user);  
+    set_screen_text(player,MAIN_SCREEN_FLD_USER, user);  
     char date[32];					
     today(date, sizeof(date));		
-    //    set_screen_text(player,MAIN_SCREEN_FLD_DATE, date);
+    set_screen_text(player,MAIN_SCREEN_FLD_DATE, date);
 }
 
 
@@ -373,21 +361,34 @@ int handler_anc_screen(struct player *player , u8 *reqbuf) {
             mb_send_update(player, 1, buf, player->scr.ic);
             return H_NO_ACTION; 
         } else {
-            struct usr_rec usr;
-            char first[NAME_T] = {0};
-            snv_name(first, usr.first);
-            printf("HELLO %s\n",first);
-            return H_NO_ACTION; // NOTE:temp
+            int ret = 1;
+            struct usr_rec usr = new_usr_rec();
+
+            if(!snv_name(form->first.val, usr.first)) {
+                // no valid characters send warning
+                ret = 0;
+            }
+
+            if(!snv_name(form->last.val, usr.last)) {
+                ret = 0;
+            }
+            
+            if(!snv_phone(form->phone.val, usr.phone)) {
+                ret = 0;
+            }
+
+            if(!snv_phone(form->email.val, usr.email)) {
+                ret = 0;
+            }
+            if(!ret){
+                return H_NO_ACTION; // NOTE:temp                
+            } else {
+                // show confirmation screen
+                // confirm add, add to db,
+                // go back to  main menu have option to view customer list
+                return H_NO_ACTION; // NOTE: temp                
+            }
         }
-        //check first and last names
-        // check email make sure structure and not already in the db
-        // check phone
-        
-
-
-        // snv items
-        // show confirmation screen
-        // confirm add and goto main menu
     default:
         return H_NO_ACTION;
     }
@@ -1259,6 +1260,11 @@ void field_set_text(struct field_state *fs, char *txt) {
 
 void field_set_color(struct field_state *fs, enum colors color) {
     fs->fg_color = color;
+}
+
+void set_screen_text(struct player *player,int col, char *buffer) {
+    strcpy(player->scr.state[col].text, buffer);
+    player->scr.state[col].text_len = strlen(buffer);
 }
 
 void tick(char *time) {

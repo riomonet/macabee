@@ -136,6 +136,16 @@ struct live_screen {
     struct field_state state[100];
 };
 
+
+/* Role values must be explictly defined or db values will no align. */
+enum ROLES {
+    ROLE_NONE = 0,
+    ROLE_ALPHA = 1,
+    ROLE_OFFICE = 2,
+    ROLE_YARD = 3,
+    ROLE_ACCOUNTING = 4,
+  };
+
 /* def_player */
 struct player {
     struct mg_connection *c;
@@ -182,6 +192,7 @@ struct anc_form {
     struct cfb email;
     struct cfb phone;
 };
+
 
 
 
