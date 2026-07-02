@@ -27,6 +27,7 @@ typedef uint64_t u64;
 #define STR2(X) #X
 #define STR(X) STR2(X)
 
+sqlite3 *db;
 
 struct __attribute__((packed)) update_header {
     u8 opcode_a;

@@ -17,8 +17,6 @@
 #include "db_DSL.c"
 #include "mac_function_prototypes.h"
 
-sqlite3 *db;
-
 
 /* ============================================================================
               SCREEN MACROS SYSTEM (DSL)
@@ -64,6 +62,67 @@ sqlite3 *db;
 
 #define STATE_LEN(id, txt, len, flg, col)       \
     X(id, txt, len, flg, col)
+
+#define FORM_FIELD(SCR, name, row, txt)         \
+    LABEL(SCR##_L##name, row, 9,27,txt)         \
+    INPUT(SCR##_##name, row, 38, 24)
+
+#define FORM_FIELD_S(SCR, name, row, txt)       \
+    LABEL(SCR##_L##name, row, 9,27,txt)         \
+    INPUT_F(SCR##_##name, row, 38, 24, PASSWORD)
+
+#define TITLE_BAR(SCR, txt)                             \
+    LABEL_C(SCR##TITLE,1,40, sizeof(txt)-1,txt, WHITE)
+
+#define TAB_HINT(SCR)                                                   \
+    LABEL_FC(SCR##TAB_HINT, 5, 5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) 
+
+#define SESSION_INFO(SCR)                       \
+    LABEL(SCR##_SCREEN_FLD_USER,1,6, 32, "")            \
+    LABEL(SCR##_SCREEN_FLD_DATE,1,67,16, "")           \
+    LABEL(SCR##_SCREEN_FLD_TIME,2,67,16, "")
+
+#define WARNING_LINE(SCR,row)                    \
+    STATUS(SCR##_WARNING ,row, 38, 42, "", HIDDEN)              
+
+#define MENU_ITEM(SCR,item_num, row, txt )             \
+    LABEL(SCR##_MENU_ITEM_##item_num, row,10,sizeof(txt)-1 + 4, #item_num". " txt) 
+
+#define MENU_SELECT(SCR)                                    \
+    LABEL(SCR##FLD_SELECTION,23,6,9,"Selection")            \
+    LABEL(SCR##FLD_ARROW,24,6,4, "===>")                    \
+    HL(SCR##_FLD_HL1,24,13,70)                              \
+    INPUT(SCR##_ISELECT,24,12,1)
+
+
+#define FKEY_X0   6      /* left margin */
+#define FKEY_GAP  4      /* spaces between legends */
+#define FKEY_HL_LEN 77
+
+#define FKEY_BAR_1(SCR, k1)                                         \
+    HL(SCR##_HLA, 26, 6, FKEY_HL_LEN)                               \
+    LABEL_FC(SCR##_F1, 28, FKEY_X0, sizeof(k1)-1, k1, FAINT, CYAN)  \
+    HL(SCR##_HLB, 29, 6, FKEY_HL_LEN)
+    
+    
+#define FKEY_BAR_2(SCR, k1, k2)                                 \
+    HL(SCR##_HLA, 26, 6, FKEY_HL_LEN)                                    \
+    LABEL_FC(SCR##_F1, 28, FKEY_X0,                             \
+    sizeof(k1)-1, k1, FAINT, CYAN)                              \
+    LABEL_FC(SCR##_F2, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
+    sizeof(k2)-1, k2, FAINT, CYAN)                              \
+    HL(SCR##_HLB, 29, 6, FKEY_HL_LEN)
+
+#define FKEY_BAR_3(SCR, k1, k2, k3)                             \
+    HL(SCR##_HLA, 26, 6, FKEY_HL_LEN)                                     \
+    LABEL_FC(SCR##_F1, 28, FKEY_X0,                             \
+    sizeof(k1)-1, k1, FAINT, CYAN)                              \
+    LABEL_FC(SCR##_F2, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
+    sizeof(k2)-1, k2, FAINT, CYAN)                              \
+    LABEL_FC(SCR##_F3, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP  \
+    + (sizeof(k2)-1) + FKEY_GAP,                                \
+    sizeof(k3)-1, k3, FAINT, CYAN)                              \
+    HL(SCR##_HLB, 29, 6, FKEY_HL_LEN)
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
@@ -120,78 +179,50 @@ screen_renderer screen_renderers[] ={
     LABEL(SCR##_FLD_TITLE,1,29,21, title)                               \
     LABEL_FC(SCR##_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
-#define SCREEN_STUB_FOOTER(SCR)                             \
-    LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
-    LABEL(SCR##FLD_ARROW,24,1,4, "-->")                     \
-    HL(SCR##_FLD_HL1,26,1,91)                              \
-    LABEL_FC(SCR##_FLD_F1,28,6,9,"F2=Logout", FAINT,CYAN)  \
-    LABEL(SCR##_FLD_F2,28,19,9, "")                         \
-    LABEL(SCR##_FLD_F3,28,31,16,"")                         \
-    HL(SCR##_FLD_HL2,29,0,92)                              \
-    HL(SCR##_FLD_HL3,24,7,85)                               \
-    INPUT(SCR##_ISELECT,24,6,1)
-
 
 #define NO_SCREEN NULL
 #define IC_NONE -1
 
 /* TODO: Fix INVERSE FLAG */
-/* LOGIN SCREEN row, col */
-#define LOGIN_SCREEN                                                    \
-    LABEL(LOGIN_L1       , 8,   9, 27, "USER . . . . . . . . . . . ")   \
-    LABEL(LOGIN_L2       , 10,  9, 27, "PASSWORD . . . . . . . . . ")   \
-    INPUT(LOGIN_IUSER    , 8,  38, 24)                                  \
-    INPUT_F(LOGIN_IPW    , 10, 38, 24,  PASSWORD)                       \
-    LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
-    LABEL(LOGIN_L4     , 1,  40, 19, "Marina 59 | Sign On")          \
-    STATUS(LOGIN_WARNING , 12, 38, 42, "", HIDDEN)                      
 
-/*   id, col, row, width */
-/* #define MAIN_SCREEN                                             \ */
+#define LOGIN_SCREEN                                            \
+    TITLE_BAR (LOGIN, "Marina 59 | Sign On")                    \
+    FORM_FIELD(LOGIN, IUSER,8,  "USER . . . . . . . . . . . ")  \
+    FORM_FIELD_S(LOGIN, IPW, 10,"PASSWORD . . . . . . . . . ")  \
+    TAB_HINT(LOGIN)                                             \
+    WARNING_LINE(LOGIN,12)
 
-#define MAIN_SCREEN                                             \
-    SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )   \
-    LABEL(MAIN_L7,8,10,21,   "1. Add new customer.")                \
-    SCREEN_STUB_FOOTER(MAIN)
-
-#define ANC_SCREEN                                                      \
-    LABEL(ANC_L1       , 8,   9, 27, "FIRST  . . . . . . . . . . . ")   \
-    LABEL(ANC_L2       , 10,  9, 27, "LAST   . . . . . . . . . . . ")   \
-    LABEL(ANC_L3       , 12,  9, 27, "EMAIL  . . . . . . . . . . . ")   \
-    LABEL(ANC_L4       , 14,  9, 27, "PHONE  . . . . . . . . . . . ")   \
-    INPUT(ANC_FIRST    , 8,  38, 24)                                    \
-    INPUT(ANC_LAST      ,10, 38, 24)                                    \
-    INPUT(ANC_EMAIL    , 12, 38, 24)                                    \
-    INPUT(ANC_PHONE    , 14, 38, 24)                                    \
-    LABEL_FC(ANC_INST   , 5,  5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
-    LABEL_C(ANC_TITLE     , 1,  40, 19, "Marina 59 | Add new customer", WHITE) \
-    STATUS(ANC_WARNING , 16, 38, 42, "", HIDDEN)                        \
-    HL(ANC_HL1,26,1,100)                                                \
-    LABEL_FC(ANC_F1,28,6,9,"F2=Logout", FAINT, CYAN)                    \
-    LABEL_FC(ANC_F2,28,19,20,"F8=Back to Main Menu",FAINT, CYAN )       \
-    HL(ANC_HL2,29,1,100)                                                \
+#define MAIN_SCREEN                             \
+    TITLE_BAR(MAIN, "Marina 59 | Main Menu")    \
+    SESSION_INFO(MAIN)                          \
+    MENU_ITEM(MAIN, 1,8, "Add new customer")    \
+    MENU_ITEM(MAIN, 2,9, "View all customers")  \
+    MENU_SELECT(MAIN)                           \
+    FKEY_BAR_1(MAIN, "F2=Logout")
 
 
-#define MAIN_SCREEN_ALPHA                               \
-    SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )    \
-    LABEL(MAIN_L7,8,10,15,   "1. Send SMS invite")      \
-    LABEL(MAIN_L8,9,10,15,   "2. Send email invite")    \
-    LABEL(MAIN_L9,10,10,15,   "3. Add new contact")     \
-    SCREEN_STUB_FOOTER(MAIN)
+/* SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )       \ */
 
-#define ADD_NEW_USER                                                    \
-    LABEL(ADD_USER_LAB_FIRST , 8 ,  9, 27, "FIRST NAME . . . . . . . . . . . ") \
-    LABEL(ADD_USER_LAB_LAST  , 10, 9, 27, "LAST NAME  . . . . . . . . . . . ") \
-    LABEL(ADD_USER_LAB_EMAIL , 12, 9, 27, "EMAIL  . . . . . . . . . . . . . ") \
-    LABEL(ADD_USER_LAB_PHONE , 14, 9, 27, "PHONE  . . . . . . . . . . . . . ") \
-    INPUT(ADD_FIRST    ,8,  38, 24)                                     \
-    INPUT(ADD_LAST     ,10, 38, 24)                                     \
-    INPUT(ADD_EMAIL    ,12, 38, 24)                                     \
-    INPUT(ADD_PHONE    ,14, 38, 24)                                     \
-    LABEL_FC(LOGIN_L3    , 5,   5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) \
-    LABEL_C(LOGIN_L4     , 1,  40, 19, "Marina 59 | Add New Macabee user", WHITE) \
-    STATUS(LOGIN_WARNING , 32, 12, 42, "", HIDDEN)
- 
+
+    
+#define ANC_SCREEN                                                  \
+    TITLE_BAR (ANC, "Marina 59 | Add new customer")                 \
+    TAB_HINT(ANC)                                                   \
+    FORM_FIELD(ANC, FIRST,  8, "FIRST  . . . . . . . . . . . " )    \
+    FORM_FIELD(ANC, LAST,  10, "LAST   . . . . . . . . . . . " )    \
+    FORM_FIELD(ANC, EMAIL, 12, "EMAIL  . . . . . . . . . . . " )    \
+    FORM_FIELD(ANC, PHONE, 14, "PHONE  . . . . . . . . . . . " )    \
+    WARNING_LINE(ANC, 16)                                           \
+    FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")
+
+
+/* #define MAIN_SCREEN_ALPHA                               \ */
+/*     SCREEN_STUB_HEADER(MAIN, Marina 59 | MAIN MENU )    \ */
+/*     LABEL(MAIN_L7,8,10,15,   "1. Send SMS invite")      \ */
+/*     LABEL(MAIN_L8,9,10,15,   "2. Send email invite")    \ */
+/*     LABEL(MAIN_L9,10,10,15,   "3. Add new contact")     \ */
+/*     SCREEN_STUB_FOOTER(MAIN) */
+
 
 /* MOBILE SCREENS (1,1) -> (59,45) */
 #define M_ACT_SCREEN                                                    \
