@@ -67,20 +67,26 @@
     LABEL(SCR##_L##name, row, 9,27,txt)         \
     INPUT(SCR##_##name, row, 38, 24)
 
+
+/* 814-8446484  */
 #define FORM_FIELD_S(SCR, name, row, txt)       \
     LABEL(SCR##_L##name, row, 9,27,txt)         \
     INPUT_F(SCR##_##name, row, 38, 24, PASSWORD)
 
-#define TITLE_BAR(SCR, txt)                             \
-    LABEL_C(SCR##TITLE,1,40, sizeof(txt)-1,txt, WHITE)
+#define GRID_COLS 80
+
+#define TITLE_BAR(SCR, txt)                     \
+    LABEL_C(SCR##_TITLE, 1,                     \
+    (GRID_COLS - (int)(sizeof(txt) - 1)) / 2,   \
+    sizeof(txt) - 1, txt, WHITE)
 
 #define TAB_HINT(SCR)                                                   \
     LABEL_FC(SCR##TAB_HINT, 5, 5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) 
 
 #define SESSION_INFO(SCR)                       \
-    LABEL(SCR##_SCREEN_FLD_USER,1,6, 32, "")            \
-    LABEL(SCR##_SCREEN_FLD_DATE,1,67,16, "")           \
-    LABEL(SCR##_SCREEN_FLD_TIME,2,67,16, "")
+    LABEL(SCR##_SCREEN_FLD_USER,1,1, 24, "")    \
+    LABEL(SCR##_SCREEN_FLD_DATE,1,64,16, "")    \
+    LABEL(SCR##_SCREEN_FLD_TIME,2,64,16, "")
 
 #define WARNING_LINE(SCR,row)                    \
     STATUS(SCR##_WARNING ,row, 38, 42, "", HIDDEN)              
@@ -89,32 +95,35 @@
     LABEL(SCR##_MENU_ITEM_##item_num, row,10,sizeof(txt)-1 + 4, #item_num". " txt) 
 
 #define MENU_SELECT(SCR)                                    \
-    LABEL(SCR##FLD_SELECTION,23,6,9,"Selection")            \
-    LABEL(SCR##FLD_ARROW,24,6,4, "===>")                    \
-    HL(SCR##_FLD_HL1,24,13,70)                              \
-    INPUT(SCR##_ISELECT,24,12,1)
+    LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
+    LABEL(SCR##FLD_ARROW,24,1,4, "===>")                    \
+    HL(SCR##_FLD_HL1,24,6,74)                              \
+    INPUT(SCR##_ISELECT,24,6,1)
+
+#define BORDER_BOTTOM(SCR)                            \
+    HL(SCR##_FLD_HLBOTTOM,29,0,80)              \
 
 
-#define FKEY_X0   6      /* left margin */
+#define FKEY_X0   1      /* left margin */
 #define FKEY_GAP  4      /* spaces between legends */
-#define FKEY_HL_LEN 77
+#define FKEY_HL_LEN 79
 
 #define FKEY_BAR_1(SCR, k1)                                         \
-    HL(SCR##_HLA, 26, 6, FKEY_HL_LEN)                               \
+    HL(SCR##_HLA, 26, FKEY_X0, FKEY_HL_LEN)                               \
     LABEL_FC(SCR##_F1, 28, FKEY_X0, sizeof(k1)-1, k1, FAINT, CYAN)  \
-    HL(SCR##_HLB, 29, 6, FKEY_HL_LEN)
+    HL(SCR##_HLB, 29, FKEY_X0, FKEY_HL_LEN)
     
     
 #define FKEY_BAR_2(SCR, k1, k2)                                 \
-    HL(SCR##_HLA, 26, 6, FKEY_HL_LEN)                                    \
+    HL(SCR##_HLA, 26, FKEY_X0, FKEY_HL_LEN)                                    \
     LABEL_FC(SCR##_F1, 28, FKEY_X0,                             \
     sizeof(k1)-1, k1, FAINT, CYAN)                              \
     LABEL_FC(SCR##_F2, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
     sizeof(k2)-1, k2, FAINT, CYAN)                              \
-    HL(SCR##_HLB, 29, 6, FKEY_HL_LEN)
+    HL(SCR##_HLB, 29, FKEY_X0, FKEY_HL_LEN)
 
 #define FKEY_BAR_3(SCR, k1, k2, k3)                             \
-    HL(SCR##_HLA, 26, 6, FKEY_HL_LEN)                                     \
+    HL(SCR##_HLA, 26, FKEY_X0, FKEY_HL_LEN)                                     \
     LABEL_FC(SCR##_F1, 28, FKEY_X0,                             \
     sizeof(k1)-1, k1, FAINT, CYAN)                              \
     LABEL_FC(SCR##_F2, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
@@ -122,7 +131,7 @@
     LABEL_FC(SCR##_F3, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP  \
     + (sizeof(k2)-1) + FKEY_GAP,                                \
     sizeof(k3)-1, k3, FAINT, CYAN)                              \
-    HL(SCR##_HLB, 29, 6, FKEY_HL_LEN)
+    HL(SCR##_HLB, 29, FKEY_X0, FKEY_HL_LEN)
 
 /* -------------------- SCREEN DEFINTIONS START--------------------- */
 
@@ -171,13 +180,6 @@ screen_renderer screen_renderers[] ={
 #undef YMB
 
 
-/* SCREEN STUBS */
-#define SCREEN_STUB_HEADER(SCR,title)                                   \
-    LABEL(SCR##_FLD_USER,1,7,32, "")                                    \
-    LABEL(SCR##_FLD_DATE,1,67,32, "")                                   \
-    LABEL(SCR##_FLD_TIME,2,67,12, "")                                   \
-    LABEL(SCR##_FLD_TITLE,1,29,21, title)                               \
-    LABEL_FC(SCR##_L6,6,6,28, "Select one of the following:", FAINT, CYAN)  
 
 
 #define NO_SCREEN NULL
@@ -186,9 +188,10 @@ screen_renderer screen_renderers[] ={
 /* TODO: Fix INVERSE FLAG */
 
 #define LOGIN_SCREEN                                            \
+    BORDER_BOTTOM(LOGIN)                                        \
     TITLE_BAR (LOGIN, "Marina 59 | Sign On")                    \
-    FORM_FIELD(LOGIN, IUSER,8,  "USER . . . . . . . . . . . ")  \
-    FORM_FIELD_S(LOGIN, IPW, 10,"PASSWORD . . . . . . . . . ")  \
+    FORM_FIELD(LOGIN, IUSER,8,  "USER . . . . . . . . . . :")  \
+    FORM_FIELD_S(LOGIN, IPW,9,  "PASSWORD . . . . . . . . :")  \
     TAB_HINT(LOGIN)                                             \
     WARNING_LINE(LOGIN,12)
 
@@ -200,18 +203,14 @@ screen_renderer screen_renderers[] ={
     MENU_SELECT(MAIN)                           \
     FKEY_BAR_1(MAIN, "F2=Logout")
 
-
-/* SCREEN_STUB_HEADER(MAIN_SCREEN, "Marina 59 | Main Menu" )       \ */
-
-
     
 #define ANC_SCREEN                                                  \
     TITLE_BAR (ANC, "Marina 59 | Add new customer")                 \
     TAB_HINT(ANC)                                                   \
     FORM_FIELD(ANC, FIRST,  8, "FIRST  . . . . . . . . . . . " )    \
-    FORM_FIELD(ANC, LAST,  10, "LAST   . . . . . . . . . . . " )    \
-    FORM_FIELD(ANC, EMAIL, 12, "EMAIL  . . . . . . . . . . . " )    \
-    FORM_FIELD(ANC, PHONE, 14, "PHONE  . . . . . . . . . . . " )    \
+    FORM_FIELD(ANC, LAST,  9, "LAST   . . . . . . . . . . . " )     \
+    FORM_FIELD(ANC, EMAIL, 10, "EMAIL  . . . . . . . . . . . " )    \
+    FORM_FIELD(ANC, PHONE, 11, "PHONE  . . . . . . . . . . . " )    \
     WARNING_LINE(ANC, 16)                                           \
     FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")
 

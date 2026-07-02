@@ -3,11 +3,30 @@
     <head>
         <style>
 
+          
          body {
-             background-color: var(--theme-bg);
-             color: var(--theme-fg);
+             margin: 0;
+             height: 100vh;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             overflow: hidden;
+             background-color: var(--theme-bg); /*orig*/
+             color: var(--theme-fg);            /*orig*/
          }
 
+         #terminal {
+             --row-h: 1.2;
+             position: relative;           /* slots now anchor to the panel */
+             font-family: monospace;
+             font-size: 16px;              /* single knob, see below */
+             width:  calc(80 * 1ch);      /* COLS */
+             height: calc(30 * var(--row-h) * 1em);     /* ROWS */
+             -webkit-font-smoothing: antialiased;
+             -moz-osx-font-smoothing: grayscale;
+         }
+
+         
          .generic-slot:focus {
              outline: none;
              box-shadow: none;
@@ -15,24 +34,29 @@
          
          .generic-slot {
              position: absolute;
-             font-family: monospace;
-             font-size: 16px;
+             /* font-family: monospace; */
+             /* font-size: 16px; */
+             font-family: inherit;
+             font-size: inherit;           /* was hardcoded 16px — inherit instead */
+             line-height: var(--row-h);             /* match the row multiplier */
+             box-sizing: border-box;
              border: none;
+             border-bottom: 1px solid transparent;
              background: transparent;
              padding: 0;
              margin: 0;
-             height: auto;
              color: inherit;     
              
              /* Drive coordinates using typography-grid registers */
-             top: calc(var(--row) * 1.2em);
-             left: calc(var(--col) * 1ch);
+             top:   calc(var(--row) * var(--row-h) * 1em);
+             left:  calc(var(--col) * 1ch);
              width: calc(var(--width) * 1ch);
+             height: calc(var(--row-h) * 1em);
          }
 
          /* Rigid input tracking frame */
          .generic-slot:not([readonly]) {
-             border-bottom: 1px solid currentColor; /* underline visible inputs */
+             border-bottom-color: currentColor; /* underline visible inputs */
          }
          .generic-slot[data-bold]      { font-weight:     bold;      }
          .generic-slot[data-faint]     { opacity:         0.5;       }
@@ -77,16 +101,20 @@
          .generic-slot[data-bg="7"] { background-color: #ffffff; } /* WHITE: standard system background \033[107m */
          .generic-slot[data-bg="8"] { background-color: #ffa500; } /* AMBER: 255, 165, 0 */
          .generic-slot[data-bg="9"] { background-color: #000000; } /* BLACK: 0, 0, 0 */
+
+
         </style>
     </head>
     <body>
-        <div id="terminal"></div>
+      <div id="terminal"></div>
+      <div id="frame-b"></div>
         <script>
          
          const MAX_SLOTS = 100;
          const INPUTS  = [];
          const SLOT_POOL = new Array(MAX_SLOTS);
-         const terminal = document.getElementById('terminal');
+          const terminal = document.getElementById('terminal');
+
          const url = "ws://localhost:8001/ws"
          
          for (let i = 0; i < MAX_SLOTS; i++) {
