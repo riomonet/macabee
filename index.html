@@ -16,7 +16,7 @@
          }
 
          #terminal {
-             --row-h: 1.2;
+             --row-h: 1.3;
              position: relative;           /* slots now anchor to the panel */
              font-family: monospace;
              font-size: 16px;              /* single knob, see below */
@@ -51,7 +51,7 @@
              top:   calc(var(--row) * var(--row-h) * 1em);
              left:  calc(var(--col) * 1ch);
              width: calc(var(--width) * 1ch);
-             height: calc(var(--row-h) * 1em);
+             height: calc(var(--height, 1) * var(--row-h) * 1em);
          }
 
          /* Rigid input tracking frame */
@@ -75,6 +75,13 @@
              pointer-events: none; 
              user-select: none;   
              border-bottom: 1px solid currentColor; 
+         }
+
+         .generic-slot.vline {
+             pointer-events: none;
+             user-select: none;
+             border-left: 1px solid currentColor;
+             border-bottom-color: transparent;  
          }
 
 
@@ -126,7 +133,7 @@
                  col: 0,
                  row: 0,
                  width: 0,
-                 r1: 0,
+                 height: 0,
                  r2: 0,
                  r3: 0
              };
@@ -147,6 +154,7 @@
              input.style.setProperty('--row', 0);
              input.style.setProperty('--col', 0);
              input.style.setProperty('--width', 0);
+             input.style.setProperty('--height', 1);
              input.toggleAttribute('data-hidden',true);
              
 	         input.disabled= true;
@@ -243,6 +251,7 @@
              INPUT: 1 << 0,
              LABEL: 1 << 1,
              HLINE: 1 << 2,
+             VLINE: 1 << 3,
          });
 
 
@@ -254,12 +263,14 @@
                  handle.disabled = true;
                  handle.type = "text";
                  handle.classList.remove('label', 'hline');
+                 handle.classList.remove('label', 'vline');
                  handle.oninput = null;
                  handle.tabIndex = -1;
                  handle.value = "";
                  handle.style.setProperty('--row', 0);
                  handle.style.setProperty('--col', 0);
                  handle.style.setProperty('--width', 0);
+                 handle.style.setProperty('--height', 1);
                  handle.toggleAttribute('data-hidden',true);
              }
          }
@@ -440,7 +451,7 @@
                  const col       = view.getUint8(layoutOffset + 2);
                  const row       = view.getUint8(layoutOffset + 3);
                  const width     = view.getUint8(layoutOffset + 4);
-                 const layout_r1 = view.getUint8(layoutOffset + 5);
+                 const height    = view.getUint8(layoutOffset + 5);
                  const layout_r2 = view.getUint8(layoutOffset + 6);
                  const layout_r3 = view.getUint8(layoutOffset + 7);
 
@@ -460,6 +471,7 @@
                  handle.layout.col = col;
                  handle.layout.row = row;
                  handle.layout.width = width;
+                 handle.layout.height = height;
                  
                  handle.state.id = stateId;
                  handle.state.flags = flags
@@ -473,6 +485,7 @@
                  handle.style.setProperty('--row', handle.layout.row);
                  handle.style.setProperty('--col', handle.layout.col); //column not color
                  handle.style.setProperty('--width', handle.layout.width);
+                 handle.style.setProperty('--height', handle.layout.height || 1);
                  handle.maxLength = handle.layout.width; // Maximum number of chars a user can type.
          
                  handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); //
@@ -497,25 +510,32 @@
                  }
                  
                  switch (handle.layout.typ) {
-                     case TYP.LABEL:
-                         { 
-                             handle.readOnly = true;
-                             handle.classList.add('label');
-                         } break;
-                     case TYP.INPUT:
-                         {
-                             handle.readOnly = false;
-		                     handle.tabIndex = 0;
-		                     handle.oninput = set_dirty;
-                             INPUTS.push(handle);
-                         } break;
-                     case TYP.HLINE:
-                         {
-                             handle.readOnly = true;
-                             handle.classList.add('hline');
-                             handle.value    = ''; 
-                             handle.tabIndex = -1; 
-                         } break;
+                 case TYP.LABEL:
+                     { 
+                         handle.readOnly = true;
+                         handle.classList.add('label');
+                     } break;
+                 case TYP.INPUT:
+                     {
+                         handle.readOnly = false;
+		                 handle.tabIndex = 0;
+		                 handle.oninput = set_dirty;
+                         INPUTS.push(handle);
+                     } break;
+                 case TYP.HLINE:
+                     {
+                         handle.readOnly = true;
+                         handle.classList.add('hline');
+                         handle.value    = ''; 
+                         handle.tabIndex = -1; 
+                     } break;
+                 case TYP.VLINE:
+                     {
+                         handle.readOnly = true;
+                         handle.classList.add('vline');
+                         handle.value    = ''; 
+                         handle.tabIndex = -1; 
+                     } break;
                  }
                  
              /* TODO: this should be encoded in flags set with ic */

@@ -15,6 +15,7 @@ typedef uint64_t u64;
 #define VIS_INPUT 1 << 0
 #define VIS_LABEL 1 << 1
 #define VIS_LINE  1 << 2
+#define VIS_VLINE 1 << 3
 #define MAX_FLD_SIZE 120
 
 

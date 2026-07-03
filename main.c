@@ -42,6 +42,9 @@
 #define HL(id, yy, xx, ww)                          \
     X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0, 0,0,0)
 
+#define VL(id, yy, xx, hh)                          \
+    X(id, VIS_VLINE, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+
 #define LABEL_F(id, yy, xx, ww, txt, flg)                           \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0, 0,0,0)
 
@@ -100,8 +103,16 @@
     HL(SCR##_FLD_HL1,24,6,74)                              \
     INPUT(SCR##_ISELECT,24,6,1)
 
-#define BORDER_BOTTOM(SCR)                            \
-    HL(SCR##_FLD_HLBOTTOM,29,0,80)              \
+#define BORDER_BOTTOM(SCR)                      \
+    HL(SCR##_FLD_HLBOTTOM,29,0,80)
+
+#define BOX(SCR,r1,c1, r2,c2)                   \
+    HL(SCR##_BOX_TOP, r1, c1, c2-c1)        \
+    VL(SCR##_BOX_LEFT,r1 + 1,c1,r2-r1)              \
+    HL(SCR##_BOX_BOTTOM, r2, c1, c2-c1)     \
+    VL(SCR##_BOX_RIGHT,r1 + 1,c2,r2-r1)
+
+
 
 
 #define FKEY_X0   1      /* left margin */
@@ -191,7 +202,9 @@ screen_renderer screen_renderers[] ={
     FORM_FIELD(LOGIN, IUSER,8,  "USER . . . . . . . . . . :")  \
     FORM_FIELD_S(LOGIN, IPW,9,  "PASSWORD . . . . . . . . :")  \
     TAB_HINT(LOGIN)                                             \
-    WARNING_LINE(LOGIN,12)
+    WARNING_LINE(LOGIN,12)                                      \
+    BOX(LOGIN, 6, 5, 10, 65)
+
 
 #define MAIN_SCREEN                             \
     TITLE_BAR(MAIN, "Marina 59 | Main Menu")    \
