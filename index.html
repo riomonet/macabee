@@ -115,14 +115,18 @@
     <body>
       <div id="terminal"></div>
       <div id="frame-b"></div>
-        <script>
-         
+      <script>
+
          const MAX_SLOTS = 100;
          const INPUTS  = [];
          const SLOT_POOL = new Array(MAX_SLOTS);
           const terminal = document.getElementById('terminal');
 
-         const url = "ws://localhost:8001/ws"
+        const url = "ws://localhost:8001/ws"
+
+        window.addEventListener('resize', fitTerminal);
+        fitTerminal();                                            
+        
          
          for (let i = 0; i < MAX_SLOTS; i++) {
 	         const input = document.createElement('input');
@@ -422,7 +426,24 @@
                      }
                  }
              }
-         }
+          }
+
+        function fitTerminal(cols = 80, rows = 30) {
+            const t = terminal;
+            const PROBE = 100;
+            t.style.fontSize = PROBE + 'px';                      /* measure at reference size */
+            const r = t.getBoundingClientRect();
+            const cellW = r.width / cols, cellH = r.height / rows;
+
+            const PAD = 0.95;                                     /* small letterbox margin */
+            const scale = Math.min(
+                (window.innerWidth  * PAD) / r.width,
+                (window.innerHeight * PAD) / r.height
+            );
+            t.style.fontSize = Math.max(10, Math.floor(PROBE * scale)) + 'px';
+        }
+
+        
 
          function sys_render_terminal(view) {
 

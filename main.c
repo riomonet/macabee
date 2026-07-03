@@ -79,7 +79,7 @@
 #define GRID_COLS 80
 
 #define TITLE_BAR(SCR, txt)                     \
-    LABEL_C(SCR##_TITLE, 1,                     \
+    LABEL_C(SCR##_TITLE, 0,                     \
     (GRID_COLS - (int)(sizeof(txt) - 1)) / 2,   \
     sizeof(txt) - 1, txt, WHITE)
 
@@ -106,11 +106,11 @@
 #define BORDER_BOTTOM(SCR)                      \
     HL(SCR##_FLD_HLBOTTOM,29,0,80)
 
-#define BOX(SCR,r1,c1, r2,c2)                   \
-    HL(SCR##_BOX_TOP, r1, c1, c2-c1)        \
-    VL(SCR##_BOX_LEFT,r1 + 1,c1,r2-r1)              \
-    HL(SCR##_BOX_BOTTOM, r2, c1, c2-c1)     \
-    VL(SCR##_BOX_RIGHT,r1 + 1,c2,r2-r1)
+#define BOX(SCR, name, row_, col_, width_, height_)                     \
+    HL(SCR##_##name##_BOX_TOP,    (row_)         , col_, width_)        \
+    HL(SCR##_##name##_BOX_BOTTOM, (row_ + height_), col_, width_)        \
+    VL(SCR##_##name##_BOX_LEFT,   (row_ + 1), col_, height_)            \
+    VL(SCR##_##name##_BOX_RIGHT,  (row_ + 1), (col_ + width_), height_) 
 
 
 
@@ -197,13 +197,12 @@ screen_renderer screen_renderers[] ={
 /* TODO: Fix INVERSE FLAG */
 
 #define LOGIN_SCREEN                                            \
-    BORDER_BOTTOM(LOGIN)                                        \
     TITLE_BAR (LOGIN, "Marina 59 | Sign On")                    \
-    FORM_FIELD(LOGIN, IUSER,8,  "USER . . . . . . . . . . :")  \
-    FORM_FIELD_S(LOGIN, IPW,9,  "PASSWORD . . . . . . . . :")  \
+    FORM_FIELD(LOGIN, IUSER,9,  "USER . . . . . . . . . . :")  \
+    FORM_FIELD_S(LOGIN, IPW,11,  "PASSWORD . . . . . . . . :")  \
     TAB_HINT(LOGIN)                                             \
     WARNING_LINE(LOGIN,12)                                      \
-    BOX(LOGIN, 6, 5, 10, 65)
+    BOX(LOGIN ,form, 0, 0, 79, 29)
 
 
 #define MAIN_SCREEN                             \
