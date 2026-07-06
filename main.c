@@ -40,10 +40,18 @@
     X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
 
 #define HL(id, yy, xx, ww)                          \
-    X(id, VIS_LINE, xx, yy, ww, "", 0, 0, 0, 0,0,0)
+    X(id, VIS_LINE, xx, yy, ww, "", 0, FAINT, 0, 0,0,0)
 
 #define VL(id, yy, xx, hh)                          \
     X(id, VIS_VLINE, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+
+
+#define HLFC(id, yy, xx, ww, flg_,  col_)                   \
+    X(id, VIS_LINE, xx, yy, ww, "", 0, flg_, col_, 0,0,0)
+
+#define VLFC(id, yy, xx, hh,flg_,col_)                      \
+    X(id, VIS_VLINE, xx, yy, 1, "", 0, flg_, col_, hh,0,0)
+
 
 #define LABEL_F(id, yy, xx, ww, txt, flg)                           \
     X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0, 0,0,0)
@@ -70,7 +78,6 @@
     LABEL(SCR##_L##name, row, 9,27,txt)         \
     INPUT(SCR##_##name, row, 38, 24)
 
-
 /* 814-8446484  */
 #define FORM_FIELD_S(SCR, name, row, txt)       \
     LABEL(SCR##_L##name, row, 9,27,txt)         \
@@ -81,15 +88,15 @@
 #define TITLE_BAR(SCR, txt)                     \
     LABEL_C(SCR##_TITLE, 0,                     \
     (GRID_COLS - (int)(sizeof(txt) - 1)) / 2,   \
-    sizeof(txt) - 1, txt, WHITE)
+    sizeof(txt) - 1, txt, WHITE)                
 
 #define TAB_HINT(SCR)                                                   \
-    LABEL_FC(SCR##TAB_HINT, 5, 5, 37, "Tab to change fields, Enter to submit", FAINT, CYAN) 
+    LABEL_FC(SCR##TAB_HINT, 5, 5, 37, "Tab to change fields, Enter to submit", FAINT, MAGENTA) 
 
 #define SESSION_INFO(SCR)                       \
-    LABEL(SCR##_SCREEN_FLD_USER,1,1, 24, "")    \
-    LABEL(SCR##_SCREEN_FLD_DATE,1,64,16, "")    \
-    LABEL(SCR##_SCREEN_FLD_TIME,2,64,16, "")
+    LABEL(SCR##_SCREEN_FLD_USER,0,1, 24, "")    \
+    LABEL(SCR##_SCREEN_FLD_DATE,0,64,16, "")    \
+    LABEL(SCR##_SCREEN_FLD_TIME,1,64,16, "")
 
 #define WARNING_LINE(SCR,row)                    \
     STATUS(SCR##_WARNING ,row, 38, 42, "", HIDDEN)              
@@ -100,18 +107,17 @@
 #define MENU_SELECT(SCR)                                    \
     LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
     LABEL(SCR##FLD_ARROW,24,1,4, "===>")                    \
-    HL(SCR##_FLD_HL1,24,6,74)                              \
-    INPUT(SCR##_ISELECT,24,6,1)
+    HL(SCR##_FLD_HL1,24,7,74)                               \
+    INPUT_F(SCR##_ISELECT,24,6,1,FAINT)
 
 #define BORDER_BOTTOM(SCR)                      \
     HL(SCR##_FLD_HLBOTTOM,29,0,80)
 
 #define BOX(SCR, name, row_, col_, width_, height_)                     \
-    HL(SCR##_##name##_BOX_TOP,    (row_)         , col_, width_)        \
-    HL(SCR##_##name##_BOX_BOTTOM, (row_ + height_), col_, width_)        \
-    VL(SCR##_##name##_BOX_LEFT,   (row_ + 1), col_, height_)            \
-    VL(SCR##_##name##_BOX_RIGHT,  (row_ + 1), (col_ + width_), height_) 
-
+    HLFC(SCR##_##name##_BOX_TOP,    (row_)         , col_, width_, FAINT, CYAN) \
+    HLFC(SCR##_##name##_BOX_BOTTOM, (row_ + height_), col_, width_, FAINT, CYAN) \
+    VLFC(SCR##_##name##_BOX_LEFT,   (row_ + 1), col_, height_,FAINT,CYAN)   \
+    VLFC(SCR##_##name##_BOX_RIGHT,  (row_ + 1), (col_ + width_), height_,FAINT,CYAN) 
 
 
 
@@ -198,11 +204,19 @@ screen_renderer screen_renderers[] ={
 
 #define LOGIN_SCREEN                                            \
     TITLE_BAR (LOGIN, "Marina 59 | Sign On")                    \
-    FORM_FIELD(LOGIN, IUSER,9,  "USER . . . . . . . . . . :")  \
-    FORM_FIELD_S(LOGIN, IPW,11,  "PASSWORD . . . . . . . . :")  \
+    FORM_FIELD(LOGIN, IUSER,9,  "USER . . . . . . . . . . .")   \
+    FORM_FIELD_S(LOGIN, IPW,11, "PASSWORD . . . . . . . . .")   \
     TAB_HINT(LOGIN)                                             \
     WARNING_LINE(LOGIN,12)                                      \
-    BOX(LOGIN ,form, 0, 0, 79, 29)
+    BOX(LOGIN ,login_form, 6, 5, 60, 7)                         \
+    BOX(LOGIN ,login_form2, 7, 7, 56, 5)                        \
+    LABEL(ANC_P_1, 15, 10, 2, "+1")                             \
+    LABEL(ANC_P_2, 15, 12, 1, "(")                              \
+    INPUT(ANC_P_AREA,15,13,3)                                  \
+    LABEL(ANC_P_3, 15, 16, 2, ") ")                             \
+    INPUT(ANC_P_digt, 15,18,3)                                  \
+    LABEL(ANC_P_4,15,21,1, "-")                               \
+    INPUT(ANC_P_finx,15,22,4)                      
 
 
 #define MAIN_SCREEN                             \
@@ -213,6 +227,7 @@ screen_renderer screen_renderers[] ={
     MENU_SELECT(MAIN)                           \
     FKEY_BAR_1(MAIN, "F2=Logout")
 
+
     
 #define ANC_SCREEN                                                  \
     TITLE_BAR (ANC, "Marina 59 | Add new customer")                 \
@@ -221,8 +236,14 @@ screen_renderer screen_renderers[] ={
     FORM_FIELD(ANC, LAST,  9, "LAST   . . . . . . . . . . . " )     \
     FORM_FIELD(ANC, EMAIL, 10, "EMAIL  . . . . . . . . . . . " )    \
     FORM_FIELD(ANC, PHONE, 11, "PHONE  . . . . . . . . . . . " )    \
-    WARNING_LINE(ANC, 16)                                           \
-    FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")
+    WARNING_LINE(ANC, 18)                                           \
+    FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")            \
+
+
+/*
+//#define LABEL(id, yy, xx, ww, txt)                      \
+//#define INPUT(id, yy, xx, ww)                           \
+*/
 
 
 /* #define MAIN_SCREEN_ALPHA                               \ */
@@ -361,7 +382,7 @@ int handler_main_screen(struct player *p , u8 *reqbuf) {
 /* MAIN SCREEN RENDERER */
 void renderer_main_screen(struct player *player) {
     char user[32];                                     
-    snprintf(user, 32, "user: %s", player->auth.uname);
+    snprintf(user, 32, "USER: %s", player->auth.uname);
     set_screen_text(player,MAIN_SCREEN_FLD_USER, user);  
     char date[32];					
     today(date, sizeof(date));		

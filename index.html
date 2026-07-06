@@ -16,9 +16,10 @@
          }
 
          #terminal {
-             --row-h: 1.3;
+             --row-h: 1.2;
              position: relative;           /* slots now anchor to the panel */
              font-family: monospace;
+             flex-shrink: 0;
              font-size: 16px;              /* single knob, see below */
              width:  calc(80 * 1ch);      /* COLS */
              height: calc(30 * var(--row-h) * 1em);     /* ROWS */
@@ -114,19 +115,17 @@
     </head>
     <body>
       <div id="terminal"></div>
-      <div id="frame-b"></div>
       <script>
 
-         const MAX_SLOTS = 100;
-         const INPUTS  = [];
-         const SLOT_POOL = new Array(MAX_SLOTS);
-          const terminal = document.getElementById('terminal');
+        const MAX_SLOTS = 100;
+        const INPUTS  = [];
+        const SLOT_POOL = new Array(MAX_SLOTS);
+        const terminal = document.getElementById('terminal');
 
         const url = "ws://localhost:8001/ws"
 
         window.addEventListener('resize', fitTerminal);
         fitTerminal();                                            
-        
          
          for (let i = 0; i < MAX_SLOTS; i++) {
 	         const input = document.createElement('input');
@@ -362,9 +361,25 @@
                                  add_key_event_listeners('F8', 'keydown', send_changed_inputs_only);
          }
 
-         function set_dirty() {
-	         this.isDirty = true;
+         function set_dirty(el) {
+             // this.isDirty = true;
+             el.isDirty =true;
          }
+
+        function check_input_bounds(el) {
+            if(el.value.length >= el.maxLength) {
+                let idx = INPUTS.indexOf(el) + 1;
+                if (idx < INPUTS.length)
+                    INPUTS[idx].focus();
+            }
+        }
+
+        function input_actions() {
+            set_dirty(this);
+            check_input_bounds(this);
+        }
+
+        
 
           const stateBufferLength = 120; // this should be probably set in the message.
           const stateHeaderLength = 8;
@@ -435,7 +450,7 @@
             const r = t.getBoundingClientRect();
             const cellW = r.width / cols, cellH = r.height / rows;
 
-            const PAD = 0.95;                                     /* small letterbox margin */
+            const PAD = .95;                                     /* small letterbox margin */
             const scale = Math.min(
                 (window.innerWidth  * PAD) / r.width,
                 (window.innerHeight * PAD) / r.height
@@ -540,7 +555,8 @@
                      {
                          handle.readOnly = false;
 		                 handle.tabIndex = 0;
-		                 handle.oninput = set_dirty;
+		                 //handle.oninput = set_dirty;
+                         handle.oninput = input_actions;
                          INPUTS.push(handle);
                      } break;
                  case TYP.HLINE:
