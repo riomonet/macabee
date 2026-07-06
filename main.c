@@ -39,15 +39,33 @@
 #define INPUT_F(id, yy, xx, ww,flg)                     \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
 
-#define HL(id, yy, xx, ww)                          \
-    X(id, VIS_LINE, xx, yy, ww, "", 0, FAINT, 0, 0,0,0)
+
+/* NOTE: faint flag hardwired */
+#define HL(id, yy, xx, ww)                                  \
+    X(id, VIS_HLINE, xx, yy, ww, "", 0, FAINT, 0, 0, 0, 0)
+
+#define HL_DBL(id, yy, xx, ww)                                  \
+    X(id, VIS_HLINE_DBL, xx, yy, ww, "", 0, FAINT,0, 0, 0, 0)
+
+#define HL_HVY(id, yy, xx, ww)                                  \
+    X(id, VIS_HLINE_HVY, xx, yy, ww, "", 0, FAINT, MAGENTA, 0, 0, 0)
+
 
 #define VL(id, yy, xx, hh)                          \
     X(id, VIS_VLINE, xx, yy, 1, "", 0, 0, 0, hh,0,0)
 
 
+#define VL_DBL(id, yy, xx, hh)                          \
+    X(id, VIS_VLINE_DBL, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+
+
+#define VL_HVY(id, yy, xx, hh)                          \
+    X(id, VIS_VLINE_HVY, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+
+
+
 #define HLFC(id, yy, xx, ww, flg_,  col_)                   \
-    X(id, VIS_LINE, xx, yy, ww, "", 0, flg_, col_, 0,0,0)
+    X(id, VIS_HLINE, xx, yy, ww, "", 0, flg_, col_, 0,0,0)
 
 #define VLFC(id, yy, xx, hh,flg_,col_)                      \
     X(id, VIS_VLINE, xx, yy, 1, "", 0, flg_, col_, hh,0,0)
@@ -105,10 +123,21 @@
     LABEL(SCR##_MENU_ITEM_##item_num, row,10,sizeof(txt)-1 + 4, #item_num". " txt) 
 
 #define MENU_SELECT(SCR)                                    \
-    LABEL(SCR##FLD_SELECTION,23,1,9,"Selection")            \
-    LABEL(SCR##FLD_ARROW,24,1,4, "===>")                    \
-    HL(SCR##_FLD_HL1,24,7,74)                               \
-    INPUT_F(SCR##_ISELECT,24,6,1,FAINT)
+    LABEL(SCR##FLD_SELECTION,24,1,9,"Selection")            \
+    LABEL(SCR##FLD_ARROW,25,1,4, "===>")                    \
+    HL(SCR##_FLD_HL1,25,7,74)                               \
+    INPUT_F(SCR##_ISELECT,25,6,1,FAINT)
+
+#define PHONE(SCR, row,col)                         \
+    LABEL(SCR##_PHONE_CC, row, col, 2, "+1")        \
+    LABEL(SCR##_PHONE_LF_P, row, col + 2, 1, "(")   \
+    INPUT(SCR##_PHONE_AREA_CODE,row,col + 3,3)      \
+    LABEL(SCR##_PHONE_RP, row,col+6, 2, ") ")       \
+    INPUT(SCR##_PHONE_EX_CODE, row,col+8,3)         \
+    LABEL(SCR##_PHONE_DASH,row,col+11,1, "-")       \
+    INPUT(SCR##_PHONE_SUBS_NUM,row,col+12,4)                   
+
+
 
 #define BORDER_BOTTOM(SCR)                      \
     HL(SCR##_FLD_HLBOTTOM,29,0,80)
@@ -126,13 +155,13 @@
 #define FKEY_HL_LEN 79
 
 #define FKEY_BAR_1(SCR, k1)                                         \
-    HL(SCR##_HLA, 26, FKEY_X0, FKEY_HL_LEN)                               \
+    HL(SCR##_HLA, 27, FKEY_X0, FKEY_HL_LEN)                               \
     LABEL_FC(SCR##_F1, 28, FKEY_X0, sizeof(k1)-1, k1, FAINT, CYAN)  \
     HL(SCR##_HLB, 29, FKEY_X0, FKEY_HL_LEN)
     
     
 #define FKEY_BAR_2(SCR, k1, k2)                                 \
-    HL(SCR##_HLA, 26, FKEY_X0, FKEY_HL_LEN)                                    \
+    HL(SCR##_HLA, 27, FKEY_X0, FKEY_HL_LEN)                                    \
     LABEL_FC(SCR##_F1, 28, FKEY_X0,                             \
     sizeof(k1)-1, k1, FAINT, CYAN)                              \
     LABEL_FC(SCR##_F2, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
@@ -210,13 +239,7 @@ screen_renderer screen_renderers[] ={
     WARNING_LINE(LOGIN,12)                                      \
     BOX(LOGIN ,login_form, 6, 5, 60, 7)                         \
     BOX(LOGIN ,login_form2, 7, 7, 56, 5)                        \
-    LABEL(ANC_P_1, 15, 10, 2, "+1")                             \
-    LABEL(ANC_P_2, 15, 12, 1, "(")                              \
-    INPUT(ANC_P_AREA,15,13,3)                                  \
-    LABEL(ANC_P_3, 15, 16, 2, ") ")                             \
-    INPUT(ANC_P_digt, 15,18,3)                                  \
-    LABEL(ANC_P_4,15,21,1, "-")                               \
-    INPUT(ANC_P_finx,15,22,4)                      
+    PHONE(LOGIN, 20,10)
 
 
 #define MAIN_SCREEN                             \
@@ -226,7 +249,6 @@ screen_renderer screen_renderers[] ={
     MENU_ITEM(MAIN, 2,9, "View all customers")  \
     MENU_SELECT(MAIN)                           \
     FKEY_BAR_1(MAIN, "F2=Logout")
-
 
     
 #define ANC_SCREEN                                                  \
@@ -238,6 +260,7 @@ screen_renderer screen_renderers[] ={
     FORM_FIELD(ANC, PHONE, 11, "PHONE  . . . . . . . . . . . " )    \
     WARNING_LINE(ANC, 18)                                           \
     FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")            \
+
 
 
 /*

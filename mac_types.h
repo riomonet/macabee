@@ -12,10 +12,18 @@ typedef uint64_t u64;
 #define OP_A_UPDATE 2
 #define OP_B_DEF 1
 
-#define VIS_INPUT 1 << 0
-#define VIS_LABEL 1 << 1
-#define VIS_LINE  1 << 2
-#define VIS_VLINE 1 << 3
+enum VIS_TYP {
+    VIS_NONE =  0,
+    VIS_INPUT = 1,
+    VIS_LABEL = 2,
+
+    VIS_HLINE = 30,
+    VIS_HLINE_HVY = 31,
+    VIS_VLINE = 40,
+    VIS_VLINE_HVY = 41,
+};
+    
+
 #define MAX_FLD_SIZE 120
 
 
@@ -77,6 +85,7 @@ struct __attribute__((packed)) field_state {
 enum permissions {
     ADMIN, CUSTOMER
 };
+
 
 enum colors {
     DEFAULT,

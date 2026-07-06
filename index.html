@@ -17,6 +17,8 @@
 
          #terminal {
              --row-h: 1.2;
+             --cell-h: calc(var(--row-h) * 1em);
+             --line-hvy: calc(var(--cell-h) * .33);
              position: relative;           /* slots now anchor to the panel */
              font-family: monospace;
              flex-shrink: 0;
@@ -26,7 +28,6 @@
              -webkit-font-smoothing: antialiased;
              -moz-osx-font-smoothing: grayscale;
          }
-
          
          .generic-slot:focus {
              outline: none;
@@ -72,19 +73,25 @@
              0%, 100% { visibility: visible; }
              50%      { visibility: hidden;  }                       }
 
-         .generic-slot.hline {
+         .generic-slot.hline,
+         .generic-slot.hline_hvy{
              pointer-events: none; 
              user-select: none;   
              border-bottom: 1px solid currentColor; 
          }
 
-         .generic-slot.vline {
+         .generic-slot.hline_hvy {border-bottom-width: var(--line-hvy);}
+
+
+         .generic-slot.vline,
+         .generic-slot.vline_hvy {
              pointer-events: none;
              user-select: none;
              border-left: 1px solid currentColor;
              border-bottom-color: transparent;  
          }
 
+         .generic-slot.vline_hvy {border-left-width: var(--line-hvy);}
 
          /* --- Foreground Hardware Register Map --- */
 
@@ -209,7 +216,7 @@
              WHITE:   '#ffffff',
              AMBER:   '#ffac00'
          });
-
+        
           const defColorsGlobal = {
              bg: COLORS.BLACK,
              fg: COLORS.WHITE
@@ -250,11 +257,13 @@
              PASSWORD:  1 << 7
          });
 
-         const TYP = Object.freeze({
-             INPUT: 1 << 0,
-             LABEL: 1 << 1,
-             HLINE: 1 << 2,
-             VLINE: 1 << 3,
+        const TYP = Object.freeze({
+            NONE:  0,
+            INPUT: 1,
+            LABEL: 2,
+
+            HLINE: 30, HLINE_HVY: 31,
+            VLINE: 40, VLINE_HVY: 41
          });
 
 
@@ -559,26 +568,27 @@
                          handle.oninput = input_actions;
                          INPUTS.push(handle);
                      } break;
-                 case TYP.HLINE:
-                     {
-                         handle.readOnly = true;
-                         handle.classList.add('hline');
-                         handle.value    = ''; 
-                         handle.tabIndex = -1; 
-                     } break;
-                 case TYP.VLINE:
-                     {
-                         handle.readOnly = true;
-                         handle.classList.add('vline');
-                         handle.value    = ''; 
-                         handle.tabIndex = -1; 
-                     } break;
+
+                 case TYP.HLINE:     set_line_class(handle, 'hline'); break; 
+                 case TYP.HLINE_DBL: set_line_class(handle, 'hline_dbl'); break;
+                 case TYP.HLINE_HVY: set_line_class(handle, 'hline_hvy'); break;
+                 case TYP.VLINE:     set_line_class(handle, 'vline'); break; 
+                 case TYP.VLINE_DBL: set_line_class(handle, 'vline_dbl'); break;
+                 case TYP.VLINE_HVY: set_line_class(handle, 'vline_hvy'); break;
                  }
+                 
                  
              /* TODO: this should be encoded in flags set with ic */
              SLOT_POOL[reserved].focus();
              }
          }
+
+        function set_line_class(handle, cls) {
+            handle.readOnly = true;
+            handle.value    = ''; 
+            handle.tabIndex = -1;
+            handle.classList.add(cls);
+        }
 
          function sys_net_init(url) {
 	         const socket = new WebSocket(url);
