@@ -130,14 +130,17 @@ enum colors def_bg_color_global = BLACK;
     HL(SCR##_FLD_HL1,25,7,74)                               \
     INPUT_F(SCR##_ISELECT,25,6,1,FAINT)
 
-#define PHONE(SCR, row,col)                         \
-    LABEL(SCR##_PHONE_CC, row, col, 2, "+1")        \
-    LABEL(SCR##_PHONE_LF_P, row, col + 2, 1, "(")   \
-    INPUT(SCR##_PHONE_AREA_CODE,row,col + 3,3)      \
-    LABEL(SCR##_PHONE_RP, row,col+6, 2, ") ")       \
-    INPUT(SCR##_PHONE_EX_CODE, row,col+8,3)         \
-    LABEL(SCR##_PHONE_DASH,row,col+11,1, "-")       \
-    INPUT(SCR##_PHONE_SUBS_NUM,row,col+12,4)                   
+#define PW_ 29
+#define PHONE(SCR, row,col)                                             \
+    LABEL(SCR##_PHONE_LAB, row, col,27, "PHONE  . . . . . . . . . . ") \
+    LABEL_F(SCR##_PHONE_CC, row, col + PW_ ,2,"+1",INVERSE)                    \
+    LABEL_F(SCR##_PHONE_LF_P, row, col + PW_ + 2,1,"(",INVERSE)                \
+    INPUT_F(SCR##_PHONE_AREA_CODE,row,col + PW_ + 3,3, INVERSE)                 \
+    LABEL_F(SCR##_PHONE_RP, row,col+PW_+6, 2,") ", INVERSE)                     \
+    INPUT_F(SCR##_PHONE_EX_CODE, row,col+ PW_ + 8,3, INVERSE)                   \
+    LABEL_F(SCR##_PHONE_DASH,row,col+PW_ + 11,1,"-",INVERSE)                   \
+    INPUT_F(SCR##_PHONE_SUBS_NUM,row,col+PW_+ 12,4,INVERSE)                   \
+    LABEL_F(SCR##_PHONE_blanks,row,col+PW_ + 16,8,"",INVERSE)     
 
 
 
@@ -261,8 +264,7 @@ screen_renderer screen_renderers[] ={
     FORM_FIELD(ANC, EMAIL, 10, "EMAIL  . . . . . . . . . . . " )    \
     WARNING_LINE(ANC, 18)                                           \
     FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")            \
-    PHONE(ANC, 11, 10)
-
+    PHONE(ANC, 11, 9)
 
 
 /*
