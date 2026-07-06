@@ -46,15 +46,28 @@ struct __attribute__((packed)) update_header {
     u16 state_bytes;
 };                              
 
+/* struct __attribute__((packed)) packet_header { */
+/*     u8 opcode_a; */
+/*     u8 opcode_b; */
+/*     u8 num_fields; */
+/*     u8 reserved; */
+/*     u16 layout_bytes;           /\* Num bytes in array *\/ */
+/*     u16 state_bytes;            /\* Num bytes in array *\/ */
+/* }; */
+
 struct __attribute__((packed)) packet_header {
     u8 opcode_a;
     u8 opcode_b;
     u8 num_fields;
-    u8 reserved;
+    u8 reserved;                /* IC right now.  */
     u16 layout_bytes;           /* Num bytes in array */
     u16 state_bytes;            /* Num bytes in array */
+    u8 grid_type;
+    u8 def_fg_color;
+    u8 def_bg_color;            /* Body Background Color */
+    u8 screen_flags;
+    u8 reserved_slots[4];
 };
-
 
 // Immutable 1 for each field
 struct __attribute__((packed)) field_layout {
@@ -97,8 +110,11 @@ enum colors {
     CYAN,
     WHITE,
     AMBER,
-    BLACK
+    BLACK,
+    YELLOW
 };
+
+
 
 enum DSP {
     BOLD      = 1 << 0,

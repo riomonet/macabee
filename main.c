@@ -18,6 +18,9 @@
 #include "mac_function_prototypes.h"
 
 
+enum colors def_fg_color_global = AMBER;
+enum colors def_bg_color_global = BLACK;
+
 /* ============================================================================
               SCREEN MACROS SYSTEM (DSL)
 =============================================================================== */
@@ -38,7 +41,6 @@
 
 #define INPUT_F(id, yy, xx, ww,flg)                     \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
-
 
 /* NOTE: faint flag hardwired */
 #define HL(id, yy, xx, ww)                                  \
@@ -94,12 +96,12 @@
 
 #define FORM_FIELD(SCR, name, row, txt)         \
     LABEL(SCR##_L##name, row, 9,27,txt)         \
-    INPUT(SCR##_##name, row, 38, 24)
+    INPUT_F(SCR##_##name, row, 38, 24, INVERSE)
 
 /* 814-8446484  */
 #define FORM_FIELD_S(SCR, name, row, txt)       \
     LABEL(SCR##_L##name, row, 9,27,txt)         \
-    INPUT_F(SCR##_##name, row, 38, 24, PASSWORD)
+    INPUT_F(SCR##_##name, row, 38, 24, PASSWORD | INVERSE)
 
 #define GRID_COLS 80
 
@@ -239,7 +241,7 @@ screen_renderer screen_renderers[] ={
     WARNING_LINE(LOGIN,12)                                      \
     BOX(LOGIN ,login_form, 6, 5, 60, 7)                         \
     BOX(LOGIN ,login_form2, 7, 7, 56, 5)                        \
-    PHONE(LOGIN, 20,10)
+
 
 
 #define MAIN_SCREEN                             \
@@ -257,9 +259,9 @@ screen_renderer screen_renderers[] ={
     FORM_FIELD(ANC, FIRST,  8, "FIRST  . . . . . . . . . . . " )    \
     FORM_FIELD(ANC, LAST,  9, "LAST   . . . . . . . . . . . " )     \
     FORM_FIELD(ANC, EMAIL, 10, "EMAIL  . . . . . . . . . . . " )    \
-    FORM_FIELD(ANC, PHONE, 11, "PHONE  . . . . . . . . . . . " )    \
     WARNING_LINE(ANC, 18)                                           \
     FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")            \
+    PHONE(ANC, 11, 10)
 
 
 
@@ -402,6 +404,7 @@ int handler_main_screen(struct player *p , u8 *reqbuf) {
     return H_NO_ACTION;
 }
 
+
 /* MAIN SCREEN RENDERER */
 void renderer_main_screen(struct player *player) {
     char user[32];                                     
@@ -492,7 +495,7 @@ int handler_login_screen(struct player *p, u8 *reqbuf) {
     return H_NO_ACTION;
 }
 
-/*______________________________MOBILE ACTIVATION__________________________ */
+ /*______________________________MOBILE ACTIVATION__________________________ */
 
 
 enum H_M_ACT_SCREEN {
@@ -536,7 +539,11 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
                                .num_fields = num_fields,
                                .reserved = ic,
                                .layout_bytes = layout_bytes, /* u16, Num bytes in each array. */
-                               .state_bytes =  state_bytes
+                               .state_bytes =  state_bytes,
+                               .grid_type = 0,
+                               .def_fg_color = def_fg_color_global,
+                               .def_bg_color = def_bg_color_global,
+                               .screen_flags = 0
     };
     
     struct net_payload_screen netscr = {

@@ -43,12 +43,13 @@
              line-height: var(--row-h);             /* match the row multiplier */
              box-sizing: border-box;
              border: none;
+
              border-bottom: 1px solid transparent;
              background: transparent;
              padding: 0;
+             padding-left: 3px;
              margin: 0;
              color: inherit;     
-             
              /* Drive coordinates using typography-grid registers */
              top:   calc(var(--row) * var(--row-h) * 1em);
              left:  calc(var(--col) * 1ch);
@@ -59,13 +60,16 @@
          /* Rigid input tracking frame */
          .generic-slot:not([readonly]) {
              border-bottom-color: currentColor; /* underline visible inputs */
+             caret-color: var(--pal-9);
+             
          }
+         
          .generic-slot[data-bold]      { font-weight:     bold;      }
          .generic-slot[data-faint]     { opacity:         0.5;       }
          .generic-slot[data-underline] { text-decoration: underline; }
          .generic-slot[data-hidden]    { visibility:      hidden;    }
 
-
+         
          .generic-slot[data-blink]     {
              animation: terminal-blink 1s step-end infinite;         }
 
@@ -93,29 +97,68 @@
 
          .generic-slot.vline_hvy {border-left-width: var(--line-hvy);}
 
+         /* ================= HARDWARE COLOR REGISTERS =================
+   The only hex in the system. Register N = --pal-N.
+   Wire byte 0 = NONE (no attribute written / resolved before paint). */
+         :root {
+             --pal-1:  #ff433d;   /* RED     */
+             --pal-2:  #4af6c3;   /* GREEN   */
+             --pal-3:  #aa5500;   /* BROWN   */
+             --pal-4:  #0068ff;   /* BLUE    */
+             --pal-5:  #ff73fd;   /* MAGENTA */
+             --pal-6:  #6699cc;   /* CYAN    */
+             --pal-7:  #ffffff;   /* WHITE   */
+             --pal-8:  #ff8b1e;   /* AMBER   */
+             --pal-9:  #000000;   /* BLACK   */
+             --pal-10: #ffd75f   /*YELLOw   */
+         }
+         /* ---- register → paint. Universal: anything wearing the attribute.
+        Must follow the .generic-slot base block (equal specificity,
+        order-resolved). ---- */
+         [data-fg="1"] { color: var(--pal-1); }
+         [data-fg="2"] { color: var(--pal-2); }
+         [data-fg="3"] { color: var(--pal-3); }
+         [data-fg="4"] { color: var(--pal-4); }
+         [data-fg="5"] { color: var(--pal-5); }
+         [data-fg="6"] { color: var(--pal-6); }
+         [data-fg="7"] { color: var(--pal-7); }
+         [data-fg="8"] { color: var(--pal-8); }
+         [data-fg="9"] { color: var(--pal-9); }
+         [data-fg="10"] { color: var(--pal-10); }
+
+         [data-bg="1"] { background-color: var(--pal-1); }
+         [data-bg="2"] { background-color: var(--pal-2); }
+         [data-bg="3"] { background-color: var(--pal-3); }
+         [data-bg="4"] { background-color: var(--pal-4); }
+         [data-bg="5"] { background-color: var(--pal-5); }
+         [data-bg="6"] { background-color: var(--pal-6); }
+         [data-bg="7"] { background-color: var(--pal-7); }
+         [data-bg="8"] { background-color: var(--pal-8); }
+         [data-bg="9"] { background-color: var(--pal-9); }
+         [data-bg="10"] { background-color: var(--pal-10); }
+
          /* --- Foreground Hardware Register Map --- */
+         /* .generic-slot[data-fg="1"] { color: #aa0000; } /\* RED: 170, 0, 0 *\/ */
+         /* .generic-slot[data-fg="2"] { color: #003300; } /\* GREEN: 0, 170, 0 (Bright green target) *\/ */
+         /* .generic-slot[data-fg="3"] { color: #aa5500; } /\* BROWN: 170, 85, 0 *\/ */
+         /* .generic-slot[data-fg="4"] { color: #0000aa; } /\* BLUE: 0, 0, 170 *\/ */
+         /* .generic-slot[data-fg="5"] { color: #6241b4; } /\* MAGENTA: 98, 65, 180 *\/ */
+         /* .generic-slot[data-fg="6"] { color: #55ffff; } /\* CYAN: 85, 255, 255 *\/ */
+         /* .generic-slot[data-fg="7"] { color: #ffffff; } /\* WHITE: standard system bright white \033[97m *\/ */
+         /* .generic-slot[data-fg="8"] { color: #ffac00; } /\* AMBER: 255, 172, 0 *\/ */
+         /* .generic-slot[data-fg="9"] { color: #000000; } /\* BLACK: 0, 0, 0 *\/ */
 
-         .generic-slot[data-fg="1"] { color: #aa0000; } /* RED: 170, 0, 0 */
-         .generic-slot[data-fg="2"] { color: #003300; } /* GREEN: 0, 170, 0 (Bright green target) */
-         .generic-slot[data-fg="3"] { color: #aa5500; } /* BROWN: 170, 85, 0 */
-         .generic-slot[data-fg="4"] { color: #0000aa; } /* BLUE: 0, 0, 170 */
-         .generic-slot[data-fg="5"] { color: #6241b4; } /* MAGENTA: 98, 65, 180 */
-         .generic-slot[data-fg="6"] { color: #55ffff; } /* CYAN: 85, 255, 255 */
-         .generic-slot[data-fg="7"] { color: #ffffff; } /* WHITE: standard system bright white \033[97m */
-         .generic-slot[data-fg="8"] { color: #ffac00; } /* AMBER: 255, 172, 0 */
-         .generic-slot[data-fg="9"] { color: #000000; } /* BLACK: 0, 0, 0 */
+         /* /\* --- Background Hardware Register Map --- *\/ */
 
-         /* --- Background Hardware Register Map --- */
-
-         .generic-slot[data-bg="1"] { background-color: #aa0000; } /* RED: 170, 0, 0 */
-         .generic-slot[data-bg="2"] { background-color: #00aa00; } /* GREEN: 0, 170, 0 (Darker green background target) */
-         .generic-slot[data-bg="3"] { background-color: #aa5500; } /* BROWN: 170, 85, 0 */
-         .generic-slot[data-bg="4"] { background-color: #0000aa; } /* BLUE: 0, 0, 170 */
-         .generic-slot[data-bg="5"] { background-color: #ff00ff; } /* MAGENTA: 255, 0, 255 */
-         .generic-slot[data-bg="6"] { background-color: #55ffff; } /* CYAN: 85, 255, 255 */
-         .generic-slot[data-bg="7"] { background-color: #ffffff; } /* WHITE: standard system background \033[107m */
-         .generic-slot[data-bg="8"] { background-color: #ffa500; } /* AMBER: 255, 165, 0 */
-         .generic-slot[data-bg="9"] { background-color: #000000; } /* BLACK: 0, 0, 0 */
+         /* .generic-slot[data-bg="1"] { background-color: #aa0000; } /\* RED: 170, 0, 0 *\/ */
+         /* .generic-slot[data-bg="2"] { background-color: #00aa00; } /\* GREEN: 0, 170, 0 (Darker green background target) *\/ */
+         /* .generic-slot[data-bg="3"] { background-color: #aa5500; } /\* BROWN: 170, 85, 0 *\/ */
+         /* .generic-slot[data-bg="4"] { background-color: #0000aa; } /\* BLUE: 0, 0, 170 *\/ */
+         /* .generic-slot[data-bg="5"] { background-color: #ff00ff; } /\* MAGENTA: 255, 0, 255 *\/ */
+         /* .generic-slot[data-bg="6"] { background-color: #55ffff; } /\* CYAN: 85, 255, 255 *\/ */
+         /* .generic-slot[data-bg="7"] { background-color: #ffffff; } /\* WHITE: standard system background \033[107m *\/ */
+         /* .generic-slot[data-bg="8"] { background-color: #ffa500; } /\* AMBER: 255, 165, 0 *\/ */
+         /* .generic-slot[data-bg="9"] { background-color: #000000; } /\* BLACK: 0, 0, 0 *\/ */
 
 
         </style>
@@ -205,27 +248,32 @@
 
           // THESE VALUES ARE ONLY USED FOR SETTING
           // SCREEN DEFAULTS
-         const COLORS = Object.freeze ({
-             BLACK:   '#000000',
-             RED:     '#aa0000',
-             GREEN:   '#00aa00',
-             BROWN:   '#aa5500',
-             BLUE:    '#0000aa',
-             MAGENTA: '#ff00ff',
-             CYAN:    '#55ffff',
-             WHITE:   '#ffffff',
-             AMBER:   '#ffac00'
-         });
+        //  const COLORS = Object.freeze ({
+        //      BLACK:   '#000000',
+        //      RED:    '#aa0000',
+        //      GREEN:   '#00aa00',
+        //      BROWN:   '#aa5500',
+        //      BLUE:    '#0000aa',
+        //      MAGENTA: '#ff00ff',
+        //      CYAN:    '#55ffff',
+        //      WHITE:   '#ffffff',
+        //      AMBER:   '#ffac00'
+        //  });
+
+        // const COLOR_WHEEL = [
+        //     null,
+        //     '#aa0000',  
+        //     '#00aa00', 
+        //     '#aa5500', 
+        //     '#0000aa', 
+        //     '#ff00ff', 
+        //     '#55ffff', 
+        //     '#ffffff', 
+        //     '#ffac00',
+        //     '#000000'
+        // ];
+
         
-          const defColorsGlobal = {
-             bg: COLORS.BLACK,
-             fg: COLORS.WHITE
-         };
-
-         document.body.style.setProperty('--theme-bg', defColorsGlobal.bg);
-         document.body.style.setProperty('--theme-fg', defColorsGlobal.fg);
-
-
           // These are indexes into the data-registers above.
           // set during runtime.
          const COLREG = Object.freeze ({
@@ -239,6 +287,11 @@
              AMBER:   8,
              BLACK:   9,
          });
+        
+        // Tmp values until set in render
+        
+        let screenDefFgColor  = COLREG.WHITE;           
+        let screenDefBgColor  = COLREG.BLACK; 
 
 
          const OPCODE_C = Object.freeze ({
@@ -264,7 +317,23 @@
 
             HLINE: 30, HLINE_HVY: 31,
             VLINE: 40, VLINE_HVY: 41
-         });
+        });
+
+        
+        // server packet header slots
+        const SPH = Object.freeze({
+            opcodeA: 0,
+            opcodeB: 1,
+            fieldCount: 2,
+            ic: 3,
+            layoutBytesSz: 4,
+            stateBytesSz: 6,
+            gridType: 8,
+            defBgColor: 9,
+            defFgColor: 10,
+            scrFlags: 11,
+            scrReserved: 12
+        });
 
 
          function globalReset() {
@@ -388,69 +457,67 @@
             check_input_bounds(this);
         }
 
-        
-
           const stateBufferLength = 120; // this should be probably set in the message.
           const stateHeaderLength = 8;
-          
-          function sys_update_terminal(view) {
-             const decoder          = new TextDecoder('utf-8');
-             const headerSize       = 8;
-             const opcodeB          = view.getUint8(1);
-             const fieldCount       = view.getUint8(2);
-             const reserved         = view.getUint8(3);
-             const layoutBytesSz    = view.getUint16(4,true); 
-             const stateBytesSz     = view.getUint16(6,true);
-             const stateBase        = headerSize;
-             const state_struct     = stateBufferLength + stateHeaderLength;
-             const IC               = reserved; /* Initial cursor flag */
-             for (let i             = 0; i < fieldCount; i++) {
-                 const stateOffset  = stateBase + (i * state_struct);
-                 const stateId   = view.getUint8(stateOffset + 0);
+        
+        function sys_update_terminal(view) {
+            const decoder          = new TextDecoder('utf-8');
+            const headerSize       = 16;
+            const opcodeB          = view.getUint8(SPH.opcodeB);
+            const fieldCount       = view.getUint8(2);
+            const reserved         = view.getUint8(3);
+            const layoutBytesSz    = view.getUint16(4,true); 
+            const stateBytesSz     = view.getUint16(6,true);
+            const stateBase        = headerSize;
+            const state_struct     = stateBufferLength + stateHeaderLength;
+            const IC               = reserved; /* Initial cursor flag */
+            for (let i             = 0; i < fieldCount; i++) {
+                const stateOffset  = stateBase + (i * state_struct);
+                const stateId   = view.getUint8(stateOffset + 0);
 
-                 const flags     = view.getUint8(stateOffset + 1);
-                 const fgColor   = view.getUint8(stateOffset + 2);
-                 const bgColor   = view.getUint8(stateOffset + 3);
-                 const textLen   = view.getUint8(stateOffset + 4);
-                 const stateR1   = view.getUint8(stateOffset + 5);
-                 const stateR2   = view.getUint8(stateOffset + 6);
-                 const stateR3   = view.getUint8(stateOffset + 7);
-                 //
-                 const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
+                const flags     = view.getUint8(stateOffset + 1);
+                const fgColor   = view.getUint8(stateOffset + 2);
+                const bgColor   = view.getUint8(stateOffset + 3);
+                const textLen   = view.getUint8(stateOffset + 4);
+                const stateR1   = view.getUint8(stateOffset + 5);
+                const stateR2   = view.getUint8(stateOffset + 6);
+                const stateR3   = view.getUint8(stateOffset + 7);
+                //
+                const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
 
-                 const handle = SLOT_POOL[stateId];
+                const handle = SLOT_POOL[stateId];
 
-                 handle.state.flags = flags;
-                 handle.state.fgColor = fgColor;
-                 handle.state.bgColor = bgColor;
+                handle.state.flags = flags;
+                handle.state.fgColor = fgColor || screenDefFgColor;
+                handle.state.bgColor = bgColor || screenDefBgColor;
 
-                 handle.state.len = textLen;
+                handle.state.len = textLen;
 
-		         handle.value = decoder.decode(textBytes);
-                 
-                 handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); 
-                 handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
-                 handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
-                 handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
-                 handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
-                 if(handle.state.flags & DSP.PASSWORD) { handle.type = "password"};
+		        handle.value = decoder.decode(textBytes);
+                
+                handle.toggleAttribute('data-bold',      handle.state.flags & DSP.BOLD); 
+                handle.toggleAttribute('data-faint',     handle.state.flags & DSP.FAINT);
+                handle.toggleAttribute('data-blink',     handle.state.flags & DSP.BLINK);
+                handle.toggleAttribute('data-underline', handle.state.flags & DSP.UNDERLINE);
+                handle.toggleAttribute('data-hidden'   , handle.state.flags & DSP.HIDDEN);
+                if(handle.state.flags & DSP.PASSWORD) { handle.type = "password"};
 
-                 handle.setAttribute('data-fg', handle.state.fgColor);
-                 handle.setAttribute('data-bg', handle.state.bgColor);
+                handle.setAttribute('data-fg', handle.state.fgColor);
+                handle.setAttribute('data-bg', handle.state.bgColor);
 
-                 if (handle.state.flags & DSP.INVERSE) {
-                     handle.state.inverse = true;
-                     handle.setAttribute('data-fg', (handle.state.bgColor || defColors.bg));
-                     handle.setAttribute('data-bg', (handle.state.fgColor || defColors.fg));
-                 } else {
-                     if (handle.state.inverse) {
-                         handle.state.inverse = false;
-                         handle.setAttribute('data-fg', (handle.state.fgColor || defColors.fg));
-                         handle.setAttribute('data-bg', (handle.state.bgColor || defColors.bg));
-                     }
-                 }
-             }
-          }
+                if (handle.state.flags & DSP.INVERSE) {
+                    handle.state.inverse = true;
+                    handle.setAttribute('data-fg', (handle.state.bgColor || defColors.bg));
+                    handle.setAttribute('data-bg', (handle.state.fgColor || defColors.fg));
+                } else {
+                    if (handle.state.inverse) {
+                        handle.state.inverse = false;
+                        handle.setAttribute('data-fg', (handle.state.fgColor || defColors.fg));
+                        handle.setAttribute('data-bg', (handle.state.bgColor || defColors.bg));
+                    }
+                }
+            }
+        }
 
         function fitTerminal(cols = 80, rows = 30) {
             const t = terminal;
@@ -467,17 +534,20 @@
             t.style.fontSize = Math.max(10, Math.floor(PROBE * scale)) + 'px';
         }
 
-        
-
          function sys_render_terminal(view) {
 
 	     const decoder          = new TextDecoder('utf-8');
-	     const headerSize       = 8;
+	     const headerSize       = 16;
              const opcodeB          = view.getUint8(1);
              const fieldCount       = view.getUint8(2);
              const reserved         = view.getUint8(3);
              const layoutBytesSz    = view.getUint16(4,true);
              const stateBytesSz     = view.getUint16(6,true);
+             const grid_type        = view.getUint8(8);
+             screenDefFgColor       = view.getUint8(9);
+             screenDefBgColor       = view.getUint8(10);
+             const scr_flags        = view.getUint8(11);
+             const scr_reserved     = view.getUint32(12, true); // BEWARE ENDIANESS
              const layoutBase       = headerSize;
              const stateBase        = layoutBase + layoutBytesSz;
 
@@ -485,6 +555,9 @@
              const state_struct     = stateBufferLength + stateHeaderLength;
              const IC               = -1; /* Initial cursor flag */
 
+             document.body.setAttribute('data-fg', screenDefFgColor);
+             document.body.setAttribute('data-bg', screenDefBgColor);
+             
              for (let i             = 0; i < fieldCount; i++) {
                  const handle       = SLOT_POOL[i];
                  const layoutOffset = layoutBase + (i * layout_struct);
@@ -520,8 +593,8 @@
                  
                  handle.state.id = stateId;
                  handle.state.flags = flags
-                 handle.state.fgColor = fgColor;
-                 handle.state.bgColor = bgColor;
+                 handle.state.fgColor = fgColor || screenDefFgColor;
+                 handle.state.bgColor = bgColor || screenDefBgColor;
                  handle.state.len = textLen;
                  
                  if (handle.state.flags & DSP.PASSWORD) { handle.type = "password"};                 
@@ -543,15 +616,10 @@
                  handle.setAttribute('data-bg', handle.state.bgColor);
 
                  if (handle.state.flags & DSP.INVERSE) {
-                     handle.state.inverse = true;
-                     handle.setAttribute('data-fg', (handle.state.bgColor || defColors.bg));
-                     handle.setAttribute('data-bg', (handle.state.fgColor || defColors.fg));
-                 } else {
-                     if (handle.state.inverse) {
-                         handle.state.inverse = false;
-                         handle.setAttribute('data-fg', (handle.state.fgColor || defColors.fg));
-                         handle.setAttribute('data-bg', (handle.state.bgColor || defColors.bg));
-                     }
+                     const bg = handle.state.bgColor;
+                     const fg = handle.state.fgColor;
+                     handle.setAttribute('data-fg', handle.state.bgColor);
+                     handle.setAttribute('data-bg', handle.state.fgColor);
                  }
                  
                  switch (handle.layout.typ) {
@@ -570,10 +638,8 @@
                      } break;
 
                  case TYP.HLINE:     set_line_class(handle, 'hline'); break; 
-                 case TYP.HLINE_DBL: set_line_class(handle, 'hline_dbl'); break;
                  case TYP.HLINE_HVY: set_line_class(handle, 'hline_hvy'); break;
                  case TYP.VLINE:     set_line_class(handle, 'vline'); break; 
-                 case TYP.VLINE_DBL: set_line_class(handle, 'vline_dbl'); break;
                  case TYP.VLINE_HVY: set_line_class(handle, 'vline_hvy'); break;
                  }
                  
