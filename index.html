@@ -22,7 +22,7 @@
              position: relative;           /* slots now anchor to the panel */
              font-family: monospace;
              flex-shrink: 0;
-             font-size: 16px;              /* single knob, see below */
+             font-size: 15px;              /* single knob, see below */
              width:  calc(80 * 1ch);      /* COLS */
              height: calc(30 * var(--row-h) * 1em);     /* ROWS */
              -webkit-font-smoothing: antialiased;
@@ -47,7 +47,6 @@
              border-bottom: 1px solid transparent;
              background: transparent;
              padding: 0;
-             padding-left: 3px;
              margin: 0;
              color: inherit;     
              /* Drive coordinates using typography-grid registers */
@@ -55,11 +54,12 @@
              left:  calc(var(--col) * 1ch);
              width: calc(var(--width) * 1ch);
              height: calc(var(--height, 1) * var(--row-h) * 1em);
+             height: calc(var(--height, 1) * var(--cell-h));
          }
 
          /* Rigid input tracking frame */
          .generic-slot:not([readonly]) {
-             border-bottom-color: currentColor; /* underline visible inputs */
+             /* border-bottom-color: currentColor; */
              caret-color: var(--pal-9);
          }
 
@@ -530,7 +530,9 @@
                 (window.innerWidth  * PAD) / r.width,
                 (window.innerHeight * PAD) / r.height
             );
+            
             t.style.fontSize = Math.max(10, Math.floor(PROBE * scale)) + 'px';
+            t.style.setProperty('--cell-h', Math.round(px * 1.2) + 'px');
         }
 
          function sys_render_terminal(view) {
