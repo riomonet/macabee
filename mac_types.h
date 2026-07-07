@@ -129,6 +129,7 @@ enum DSP {
 
 enum FLAGS_H {
     CLICKABLE = 1 << 0,
+    NUMERIC = 1 << 1,
 };
 
 

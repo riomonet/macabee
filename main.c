@@ -18,7 +18,7 @@
 #include "mac_function_prototypes.h"
 
 
-enum colors def_fg_color_global = AMBER;
+enum colors def_fg_color_global = WHITE;
 enum colors def_bg_color_global = BLACK;
 
 /* ============================================================================
@@ -96,12 +96,12 @@ enum colors def_bg_color_global = BLACK;
 
 #define FORM_FIELD(SCR, name, row, txt)         \
     LABEL(SCR##_L##name, row, 9,27,txt)         \
-    INPUT_F(SCR##_##name, row, 38, 24, INVERSE)
+    INPUT(SCR##_##name, row, 38, 24)
 
 /* 814-8446484  */
 #define FORM_FIELD_S(SCR, name, row, txt)       \
     LABEL(SCR##_L##name, row, 9,27,txt)         \
-    INPUT_F(SCR##_##name, row, 38, 24, PASSWORD | INVERSE)
+    INPUT_F(SCR##_##name, row, 38, 24, PASSWORD)
 
 #define GRID_COLS 80
 
@@ -133,14 +133,14 @@ enum colors def_bg_color_global = BLACK;
 #define PW_ 29
 #define PHONE(SCR, row,col)                                             \
     LABEL(SCR##_PHONE_LAB, row, col,27, "PHONE  . . . . . . . . . . ") \
-    LABEL_F(SCR##_PHONE_CC, row, col + PW_ ,2,"+1",INVERSE)                    \
-    LABEL_F(SCR##_PHONE_LF_P, row, col + PW_ + 2,1,"(",INVERSE)                \
-    INPUT_F(SCR##_PHONE_AREA_CODE,row,col + PW_ + 3,3, INVERSE)                 \
-    LABEL_F(SCR##_PHONE_RP, row,col+PW_+6, 2,") ", INVERSE)                     \
-    INPUT_F(SCR##_PHONE_EX_CODE, row,col+ PW_ + 8,3, INVERSE)                   \
-    LABEL_F(SCR##_PHONE_DASH,row,col+PW_ + 11,1,"-",INVERSE)                   \
-    INPUT_F(SCR##_PHONE_SUBS_NUM,row,col+PW_+ 12,4,INVERSE)                   \
-    LABEL_F(SCR##_PHONE_blanks,row,col+PW_ + 16,8,"",INVERSE)     
+    LABEL(SCR##_PHONE_CC, row, col + PW_ ,2,"+1")                    \
+    LABEL(SCR##_PHONE_LF_P, row, col + PW_ + 2,1,"(")                \
+    INPUT(SCR##_PHONE_AREA_CODE,row,col + PW_ + 3,3)                 \
+    LABEL(SCR##_PHONE_RP, row,col+PW_+6, 1,")")                     \
+    INPUT(SCR##_PHONE_EX_CODE, row,col+ PW_ + 7,3)                   \
+    LABEL(SCR##_PHONE_DASH,row,col+PW_ + 10,1,"-")                   \
+    INPUT(SCR##_PHONE_SUBS_NUM,row,col+PW_+ 11,4)                   \
+    LABEL(SCR##_PHONE_blanks,row,col+PW_ + 15,8,"")     
 
 
 
@@ -260,17 +260,11 @@ screen_renderer screen_renderers[] ={
     TITLE_BAR (ANC, "Marina 59 | Add new customer")                 \
     TAB_HINT(ANC)                                                   \
     FORM_FIELD(ANC, FIRST,  8, "FIRST  . . . . . . . . . . . " )    \
-    FORM_FIELD(ANC, LAST,  9, "LAST   . . . . . . . . . . . " )     \
-    FORM_FIELD(ANC, EMAIL, 10, "EMAIL  . . . . . . . . . . . " )    \
+    FORM_FIELD(ANC, LAST,  10, "LAST   . . . . . . . . . . . " )     \
+    FORM_FIELD(ANC, EMAIL, 12, "EMAIL  . . . . . . . . . . . " )    \
     WARNING_LINE(ANC, 18)                                           \
     FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")            \
-    PHONE(ANC, 11, 9)
-
-
-/*
-//#define LABEL(id, yy, xx, ww, txt)                      \
-//#define INPUT(id, yy, xx, ww)                           \
-*/
+    PHONE(ANC, 14, 9)
 
 
 /* #define MAIN_SCREEN_ALPHA                               \ */

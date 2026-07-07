@@ -16,15 +16,15 @@
          }
 
          #terminal {
-             --row-h: 1.2;
-             --cell-h: calc(var(--row-h) * 1em);
-             --line-hvy: calc(var(--cell-h) * .33);
+             --cell-h: 24px; 
+             --cell-w: 1ch;
+             --line-hvy: calc(var(--cell-h) * .33); /*TODO: can send this scale factor on the wire.*/
              position: relative;           /* slots now anchor to the panel */
              font-family: monospace;
              flex-shrink: 0;
-             font-size: 15px;              /* single knob, see below */
-             width:  calc(80 * 1ch);      /* COLS */
-             height: calc(30 * var(--row-h) * 1em);     /* ROWS */
+             font-size: 20px;             
+             width:  calc(80 * var(--cell-w));             /* Width of each col.  */
+             height: calc(30 * var(--cell-h));             /* Height of each row. */
              -webkit-font-smoothing: antialiased;
              -moz-osx-font-smoothing: grayscale;
          }
@@ -37,30 +37,27 @@
          .generic-slot {
              position: absolute;
              /* font-family: monospace; */
-             /* font-size: 16px; */
+             /* font-size: 20px; */
              font-family: inherit;
              font-size: inherit;           /* was hardcoded 16px — inherit instead */
-             line-height: var(--row-h);             /* match the row multiplier */
+             line-height: var(--cell-h);             /* match the row multiplier */
              box-sizing: border-box;
              border: none;
-
              border-bottom: 1px solid transparent;
              background: transparent;
              padding: 0;
              margin: 0;
              color: inherit;     
              /* Drive coordinates using typography-grid registers */
-             top:   calc(var(--row) * var(--row-h) * 1em);
-             left:  calc(var(--col) * 1ch);
-             width: calc(var(--width) * 1ch);
-             height: calc(var(--height, 1) * var(--row-h) * 1em);
+             top:   calc(var(--row) * var(--cell-h));
              height: calc(var(--height, 1) * var(--cell-h));
+             left:  calc(var(--col) * var(--cell-w));
+             width: calc(var(--width) * var(--cell-w));
          }
 
          /* Rigid input tracking frame */
          .generic-slot:not([readonly]) {
-             /* border-bottom-color: currentColor; */
-             caret-color: var(--pal-9);
+             border-bottom-color: currentColor;
          }
 
          .generic-slot[data-bold]      { font-weight:     bold;      }
@@ -159,7 +156,6 @@
          /* .generic-slot[data-bg="8"] { background-color: #ffa500; } /\* AMBER: 255, 165, 0 *\/ */
          /* .generic-slot[data-bg="9"] { background-color: #000000; } /\* BLACK: 0, 0, 0 *\/ */
 
-
         </style>
     </head>
     <body>
@@ -170,7 +166,7 @@
         const INPUTS  = [];
         const SLOT_POOL = new Array(MAX_SLOTS);
         const terminal = document.getElementById('terminal');
-
+        const ROW_H = 1.2;
         const url = "ws://localhost:8001/ws"
 
         window.addEventListener('resize', fitTerminal);
@@ -318,22 +314,6 @@
             VLINE: 40, VLINE_HVY: 41
         });
 
-        
-        // server packet header slots
-        const SPH = Object.freeze({
-            opcodeA: 0,
-            opcodeB: 1,
-            fieldCount: 2,
-            ic: 3,
-            layoutBytesSz: 4,
-            stateBytesSz: 6,
-            gridType: 8,
-            defBgColor: 9,
-            defFgColor: 10,
-            scrFlags: 11,
-            scrReserved: 12
-        });
-
 
          function globalReset() {
              INPUTS.length = 0;
@@ -345,6 +325,7 @@
                  handle.classList.remove('label', 'hline');
                  handle.classList.remove('label', 'vline');
                  handle.oninput = null;
+                 handle.onkeydown = null;
                  handle.tabIndex = -1;
                  handle.value = "";
                  handle.style.setProperty('--row', 0);
@@ -431,16 +412,15 @@
 	         });
          }
 
-         function add_AID_keys() {
-	                             add_key_event_listeners('Enter', 'keydown', send_changed_inputs_only);
-                                 add_key_event_listeners('F2', 'keydown', send_changed_inputs_only);
-                                 add_key_event_listeners('F6', 'keydown', send_changed_inputs_only);
-                                 add_key_event_listeners('F8', 'keydown', send_changed_inputs_only);
-         }
+        function add_AID_keys() {
+	        add_key_event_listeners('Enter', 'keydown', send_changed_inputs_only);
+            add_key_event_listeners('F2', 'keydown', send_changed_inputs_only);
+            add_key_event_listeners('F6', 'keydown', send_changed_inputs_only);
+            add_key_event_listeners('F8', 'keydown', send_changed_inputs_only);
+        }
 
-         function set_dirty(el) {
-             // this.isDirty = true;
-             el.isDirty =true;
+         function set_dirty() {
+             this.isDirty =true;
          }
 
         function check_input_bounds(el) {
@@ -451,10 +431,7 @@
             }
         }
 
-        function input_actions() {
-            set_dirty(this);
-            check_input_bounds(this);
-        }
+
 
           const stateBufferLength = 120; // this should be probably set in the message.
           const stateHeaderLength = 8;
@@ -518,27 +495,25 @@
             }
         }
 
+
         function fitTerminal(cols = 80, rows = 30) {
             const t = terminal;
             const PROBE = 100;
-            t.style.fontSize = PROBE + 'px';                      /* measure at reference size */
+            t.style.setProperty('--cell-h', (PROBE * ROW_H) + 'px');   /* cell follows the probe */
+            t.style.fontSize = PROBE + 'px';
             const r = t.getBoundingClientRect();
-            const cellW = r.width / cols, cellH = r.height / rows;
-
-            const PAD = .95;                                     /* small letterbox margin */
-            const scale = Math.min(
-                (window.innerWidth  * PAD) / r.width,
-                (window.innerHeight * PAD) / r.height
-            );
-            
-            t.style.fontSize = Math.max(10, Math.floor(PROBE * scale)) + 'px';
-            t.style.setProperty('--cell-h', Math.round(px * 1.2) + 'px');
+            const PAD = .95;
+            const scale = Math.min((innerWidth * PAD) / r.width,
+                                   (innerHeight * PAD) / r.height);
+            const px = Math.max(10, Math.floor(PROBE * scale));
+            t.style.fontSize = px + 'px';
+            t.style.setProperty('--cell-h', Math.round(px * ROW_H) + 'px');
         }
-
+        
          function sys_render_terminal(view) {
 
-	     const decoder          = new TextDecoder('utf-8');
-	     const headerSize       = 16;
+	         const decoder          = new TextDecoder('utf-8');
+	         const headerSize       = 16;
              const opcodeB          = view.getUint8(1);
              const fieldCount       = view.getUint8(2);
              const reserved         = view.getUint8(3);
@@ -633,8 +608,8 @@
                      {
                          handle.readOnly = false;
 		                 handle.tabIndex = 0;
-		                 //handle.oninput = set_dirty;
-                         handle.oninput = input_actions;
+		                 handle.oninput = set_dirty;
+                         handle.onkeydown = keydown_actions;
                          INPUTS.push(handle);
                      } break;
 
@@ -649,6 +624,59 @@
              SLOT_POOL[reserved].focus();
              }
          }
+
+        function keydown_actions(e) {
+            const el = this;
+
+            /* printable key, field FULL → focus next; key lands there natively */
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey
+                && el.value.length >= el.maxLength
+                && el.selectionStart === el.selectionEnd) {
+                const n = INPUTS.indexOf(el) + 1;
+                if (n < INPUTS.length) {
+                    INPUTS[n].focus();
+                    INPUTS[n].setSelectionRange(0, 0);
+                }
+                return;                     /* NO preventDefault — key delivers to new field */
+            }
+
+            switch (e.key) {
+            case 'Backspace':               /* empty field → previous, caret at end */
+                
+                if (el.selectionStart  === 0 && el.selectionEnd === 0) {
+                    e.preventDefault();
+                    const p = INPUTS.indexOf(el) - 1;
+                    if (p >= 0) {
+                        INPUTS[p].focus();
+                        INPUTS[p].setSelectionRange(INPUTS[p].value.length, INPUTS[p].value.length);
+                    }
+                }
+                break;
+
+            case 'ArrowLeft':               /* caret at 0 → previous, caret at end */
+                if (el.selectionStart === 0 && el.selectionEnd === 0) {
+                    e.preventDefault();
+                    const p = INPUTS.indexOf(el) - 1;
+                    if (p >= 0) {
+                        INPUTS[p].focus();
+                        INPUTS[p].setSelectionRange(INPUTS[p].value.length, INPUTS[p].value.length);
+                    }
+                }
+                break;
+
+            case 'ArrowRight':              /* caret at end → next, caret at start */
+                if (el.selectionStart === el.value.length
+                    && el.selectionEnd === el.value.length) {
+                    e.preventDefault();
+                    const n = INPUTS.indexOf(el) + 1;
+                    if (n < INPUTS.length) {
+                        INPUTS[n].focus();
+                        INPUTS[n].setSelectionRange(0, 0);
+                    }
+                }
+                break;
+            }
+        }
 
         function set_line_class(handle, cls) {
             handle.readOnly = true;
