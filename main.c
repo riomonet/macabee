@@ -571,7 +571,6 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
  * in an authorized or unauthorized state. */
 struct player *players = NULL;
 
-
 void logout_player(struct player *player) {
     player->scrat = 0;
     player->auth.logintim = 0;
@@ -595,7 +594,7 @@ struct player *onboard_new_player(struct mg_connection *c) {
     memset(player->auth.uname, 0, sizeof(player->auth.uname)); 
     player->auth.id = UID_NF;           
     player->auth.locked_until = 0;
-    HASH_ADD_PTR(players, c, player);
+    //    HASH_ADD_PTR(players, c, player);
     return player;
 }
 
@@ -1397,11 +1396,17 @@ int try_login(struct player *player, u8 *reqbuf) {
     char username[NAME_T] = {0};
     char password[NAME_T] = {0};
 
-    memcpy(username, attempt->username.val, attempt->username.len);
-    memcpy(password, attempt->password.val, attempt->password.len);
+    u8 ulen = attempt->username.len;
+    if (ulen >= sizeof username) ulen = sizeof username -1;
+    memcpy(username, attempt->username.val, ulen);
+    username[ulen] = '\0';
 
+    u8 pwlen = attempt->password.len;
+    if (pwlen >= sizeof password) pwlen = sizeof password - 1;
+    memcpy(password, attempt->password.val, pwlen);
+    password[pwlen] = '\0';
+    
     snv_name(username, usr.uname);
-
     /* search db for user */
     read_usr_all(db, &users);
     for (int i = 0; i < users.len; i++ ) {
@@ -1436,6 +1441,8 @@ int try_login(struct player *player, u8 *reqbuf) {
             render_login_warning(player, "Invalid Credentials. plase try again");
         }
         
+        sodium_memzero(password, sizeof password);
+        sodium_memzero(attempt->password.val, sizeof attempt->password.val);
         return 0;
         }
 }
@@ -1461,20 +1468,11 @@ const u8 screen_router[][32] = {
     
 };
 
-
 /* Dispatch Busines Logic */
-void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen) {
+void dispatch_business_logic(struct player *player, u8 *reqbuf, int reqbuflen) {
+    
     (void) reqbuflen;
-    
-    struct player *player = NULL;
     u32 nxt_screen, handler_res;
-
-    
-    HASH_FIND_PTR(players, &c, player);
-
-    if(!player) {
-        player = onboard_new_player(c);
-    };
 
     /* array of handler functions */
     handler_res = screen_handlers[player->scrid](player, reqbuf);
@@ -1497,6 +1495,13 @@ void dispatch_business_logic(struct mg_connection *c, u8 *reqbuf, int reqbuflen)
        The MONGOOSE HERE
    =========================================================================== */
 
+void session_end(struct player *p) {
+    /* remove from hash table */
+    //    HASH_DEL(players,p);
+    sodium_memzero(p, sizeof *p);
+    free(p);
+}
+
 void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     switch (ev) {
     case MG_EV_HTTP_MSG:
@@ -1509,13 +1514,38 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
                 mg_ws_upgrade(c, hm, NULL);
             }
         } break;
+
+    case MG_EV_WS_OPEN:
+        {
+            struct player *p = onboard_new_player(c);
+            if (!p) {
+                c->is_closing = 1;
+                break;
+            }
+            c->fn_data = p;
+        } break;
+
+        
     case MG_EV_WS_MSG:
         {
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
-                dispatch_business_logic(c, (u8*)wm->data.buf, wm->data.len); 
+                struct player *p = c->fn_data;
+                if(!p) break;
+                p->last_seen = time(NULL);
+                dispatch_business_logic(p, (u8*)wm->data.buf, wm->data.len); 
             }
-        }
+        } break;
+
+    case MG_EV_CLOSE:
+        {
+            struct player *p = c->fn_data;
+            if (p) {
+                p->c = NULL;
+                session_end(p);
+                c->fn_data = NULL;
+            }
+         } break;
     }
 }
 
@@ -1744,8 +1774,9 @@ int main(void) {
     db = init_db();
     create_tables(db);
     init_screen_renderers();
+
 #if DEV_MODE == 0
-    printf("DEV_MODE NOT");
+    printf("!DEV_MODE");
     require_root(db);
 #endif
             

@@ -218,7 +218,7 @@
 	         SLOT_POOL[i] = input;
          }
          
-         const socket = sys_net_init(url);
+//         let socket = sys_net_init(url);
          disableTabDefaults();
          add_AID_keys();
 
@@ -702,32 +702,39 @@
             handle.classList.add(cls);
         }
 
-         function sys_net_init(url) {
-	         const socket = new WebSocket(url);
-	         socket.binaryType = "arraybuffer";  
-	         socket.onmessage = function(event) {
-                 if(event.data.byteLength > 0) {
-                     const view = new DataView(event.data);
-                     const opcodeA = view.getUint8(0);
-                     if(opcodeA === OPCODE_A.NEW) {
-                         globalReset();
-                         sys_render_terminal(view);
-                     } else {
-                         sys_update_terminal(view);
-                     }
-                 } 
-	         };
+        let retryMs = 300;
 
-	         socket.onopen = ()  =>
-	             {
-		             console.log  ("Network pipeline connected to C backend.");
-		             socket.send(Uint8Array.of(0x88));
-	             }
-             
-	         socket.onerror = (err) => console.error("Network socket error:", err);
-	         socket.onclose = ()    => console.log  ("Network pipeline disconnected.");
-	         return socket;
-         }
+        function sys_net_init(url) {
+	        const s = new WebSocket(url);
+	        s.binaryType = "arraybuffer";  
+	        s.onmessage = function(event) {
+                if(event.data.byteLength > 0) {
+                    const view = new DataView(event.data);
+                    const opcodeA = view.getUint8(0);
+                    if(opcodeA === OPCODE_A.NEW) {
+                        globalReset();
+                        sys_render_terminal(view);
+                    } else {
+                        sys_update_terminal(view);
+                    }
+                } 
+	        };
+            
+	        s.onopen = ()  => {
+                retryMs = 300;
+		        console.log  ("Network pipeline connected to C backend.");
+		        socket.send(Uint8Array.of(0x88));
+	        };
+            
+	        s.onclose = () => {
+                console.log  ("Disconnected - retry in", retryMs);
+                setTimeout(() => { socket = sys_net_init(url); }, retryMs);
+                retryMs = Math.min(retryMs * 2, 5000);
+            };
+            s.onerror = (err) => console.error("Network socket error:", err);
+	        return s;
+        }
+         let socket = sys_net_init(url);        
         </script>
     </body>
 </html>

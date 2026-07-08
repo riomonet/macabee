@@ -189,6 +189,7 @@ struct player {
         char uname[25];
         time_t locked_until;
     } auth;
+    u32 last_seen;
 };
 
 
