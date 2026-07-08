@@ -34,59 +34,57 @@ enum colors def_bg_color_global = BLACK;
 
 
 #define LABEL(id, yy, xx, ww, txt)                                  \
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0, 0, 0, 0)
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, 0, 0, 0, 0, 0, 0 ,0)
 
 #define INPUT(id, yy, xx, ww)                           \
-    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, 0,0,0)
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, 0, 0, 0, 0, 0 , 0 )
 
 #define INPUT_NUM(id, yy, xx, ww)                           \
-    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, NUMERIC,0,0)
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0,0,0,0, NUMERIC, 0 , 0)
 
 #define INPUT_F(id, yy, xx, ww,flg)                     \
-    X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0, 0, 0 , 0)
 
 /* NOTE: faint flag hardwired */
 #define HL(id, yy, xx, ww)                                  \
-    X(id, VIS_HLINE, xx, yy, ww, "", 0, FAINT, 0, 0, 0, 0)
+    X(id, VIS_HLINE, xx, yy, ww, "", 0, FAINT, 0, 0, 0, 0, 0, 0 , 0)
 
 #define HL_DBL(id, yy, xx, ww)                                  \
-    X(id, VIS_HLINE_DBL, xx, yy, ww, "", 0, FAINT,0, 0, 0, 0)
+    X(id, VIS_HLINE_DBL, xx, yy, ww, "", 0, FAINT,0, 0, 0, 0, 0, 0 , 0)
 
-#define HL_HVY(id, yy, xx, ww)                                  \
-    X(id, VIS_HLINE_HVY, xx, yy, ww, "", 0, FAINT, MAGENTA, 0, 0, 0)
-
-
-#define VL(id, yy, xx, hh)                          \
-    X(id, VIS_VLINE, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+#define HL_HVY(id, yy, xx, ww)                                          \
+    X(id, VIS_HLINE_HVY, xx, yy, ww, "", 0, FAINT, MAGENTA, 0, 0, 0, 0, 0 , 0)
 
 
-#define VL_DBL(id, yy, xx, hh)                          \
-    X(id, VIS_VLINE_DBL, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+#define VL(id, yy, xx, hh)                              \
+    X(id, VIS_VLINE, xx, yy, 1, "", 0, 0, 0, hh,0,0, 0, 0 , 0)
 
 
-#define VL_HVY(id, yy, xx, hh)                          \
-    X(id, VIS_VLINE_HVY, xx, yy, 1, "", 0, 0, 0, hh,0,0)
+#define VL_DBL(id, yy, xx, hh)                              \
+    X(id, VIS_VLINE_DBL, xx, yy, 1, "", 0, 0, 0, hh,0,0, 0, 0 , 0)
 
 
+#define VL_HVY(id, yy, xx, hh)                              \
+    X(id, VIS_VLINE_HVY, xx, yy, 1, "", 0, 0, 0, hh,0,0, 0, 0 , 0)
 
 #define HLFC(id, yy, xx, ww, flg_,  col_)                   \
-    X(id, VIS_HLINE, xx, yy, ww, "", 0, flg_, col_, 0,0,0)
+    X(id, VIS_HLINE, xx, yy, ww, "", 0, flg_, col_, 0,0,0, 0, 0 , 0)
 
 #define VLFC(id, yy, xx, hh,flg_,col_)                      \
-    X(id, VIS_VLINE, xx, yy, 1, "", 0, flg_, col_, hh,0,0)
+    X(id, VIS_VLINE, xx, yy, 1, "", 0, flg_, col_, hh,0,0, 0, 0 , 0)
 
 
 #define LABEL_F(id, yy, xx, ww, txt, flg)                           \
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0, 0,0,0)
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, 0, 0,0,0, 0, 0 , 0)
 
 #define LABEL_C(id, yy, xx, ww, txt, col)                           \
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col, 0,0,0)
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, 0, col, 0,0,0, 0, 0 , 0)
 
 #define LABEL_FC(id, yy, xx, ww, txt, flg, col)                         \
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, 0,0,0)
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, 0,0,0, 0, 0 , 0)
 
 #define LABEL_FCF(id, yy, xx, ww, txt, flg, col)                        \
-    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, CLICKABLE ,0,0)
+    X(id, VIS_LABEL, xx, yy, ww, txt, sizeof(txt)-1, flg, col, 0 ,0,0, CLICKABLE, 0 , 0)
 
 #define STATUS(id, yy, xx, ww, txt, flg)        \
     LABEL_F(id, yy, xx, ww, txt, flg)
@@ -296,7 +294,7 @@ screen_renderer screen_renderers[] ={
 /* -------------------------------------------- END SCREEN DEFINTIONS --------------------------------------------- */
 
 
-#define X(id, t, x, y, w, txt, len, flg, col,r1,r2,r3) id,
+#define X(id, t, x, y, w, txt, len, flg, col,r1,r2,r3,l1,l2,l3) id,
 #define YMB(SCR,scr, IC) enum SCR##_IDX {SCR SCR##_FIELD_COUNT};
 SCREENS_LIST
 #undef X
@@ -304,16 +302,16 @@ SCREENS_LIST
 
 
 #define YMB(SCR,scr,IC) struct field_layout scr##_layout[] = {SCR};   
-#define X(id, t, xx, yy, w, txt, len, flg, col, ht, rr2, rr3)                 \
-    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w), .height = (ht), .r2= (rr2), .r3 = (rr3) },
+#define X(id, t, xx, yy, w, txt, len, flg, col, ht_, l2_, l3_,flag_h_,s2_,s3_)    \
+    { .field_id = (id), .type = (t), .x = (xx), .y = (yy), .width = (w), .height = (ht_), .r2= (l2_), .r3 = (l3_) },
 SCREENS_LIST
 #undef X
 #undef YMB
 
 #define YMB(SCR,scr,IC) struct field_state scr##_state[] = {SCR};
-#define X(id, t, x, y, w, txt, len, flg, col, flg_h, rr2, rr3)        \
+#define X(id, t, x, y, w, txt, len, flg, col, l1_, l2_, l3_,flag_h_,s2_,s3_)   \
     { .field_id = (id), .text = (txt), .text_len = (len),   \
-    .fg_color = (col), .flags = (flg), .flags_h = (flg_h), .r2 = (rr2), .r3 = (rr3) },
+    .fg_color = (col), .flags = (flg), .flags_h = (flag_h_), .r2 = (s2_), .r3 = (s3_) },
 SCREENS_LIST
 #undef X
 #undef YMB
@@ -339,9 +337,6 @@ struct screen screens[] = {SCREENS_LIST};
 /* ------------------------------------------------------------------------ */
 /*========================= FIELD MANIPULATION FUNCTIONS=================== */
 /* ------------------------------------------------------------------------ */
-
-
-
 
 
 
