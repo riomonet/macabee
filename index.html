@@ -305,6 +305,12 @@
              PASSWORD:  1 << 7
          });
 
+        const FLAGS_H = Object.freeze({
+            CLICKABLE:  1 << 0,
+            NUMERIC:    1 << 1,
+        });
+
+                             
         const TYP = Object.freeze({
             NONE:  0,
             INPUT: 1,
@@ -324,6 +330,7 @@
                  handle.type = "text";
                  handle.classList.remove('label', 'hline');
                  handle.classList.remove('label', 'vline');
+                 handle.removeAttribute('data-num');
                  handle.oninput = null;
                  handle.onkeydown = null;
                  handle.tabIndex = -1;
@@ -363,9 +370,11 @@
          /* Header */
          /* opcodeC |AID Key 1b| nFields | */
          /* Field blocks */
-         /* |field_id 1b| field_len 1b| field_val | */
-         function send_changed_inputs_only(key) {
-             const field_len = 24; //fixed width.
+        /* |field_id 1b| field_len 1b| field_val | */
+
+        function send_changed_inputs_only(key) {
+            const MAX_CLIENT_FIELD = 128; 
+  //           const field_len = 24; 
              const MDT = [];
              let bytes = 0;
              const encoder = new TextEncoder();
@@ -382,7 +391,8 @@
                      MDT.push(INPUTS[i]);
                      bytes++; /* field_id 1b*/
                      bytes++; /* field_len 1b*/
-                     bytes += field_len;
+                     // bytes += field_len;
+                     bytes += MAX_CLIENT_FIELD;
                  }
              }
              
@@ -391,16 +401,16 @@
              let pos = 0;
              copybook[pos++] = OPCODE_C.STD;
              copybook[pos++] = AID; //aidkey resolve
-             copybook[pos++] = MDT.length; // nfields
-             for(let i = 0; i <  MDT.length; i++) {
-                 copybook[pos++] = MDT[i].state.id;
-                 copybook[pos++] = MDT[i].value.length;
-                 const text = encoder.encode(MDT[i].value);
-                 copybook.set(text, pos);
-                 //                 pos += text.length;
-                 pos+=24;
-             }
-             socket.send(buffer);
+            copybook[pos++] = MDT.length; // nfields
+
+            for (let i = 0; i < MDT.length; i++) {
+                const text = encoder.encode(MDT[i].value);
+                copybook[pos++] = MDT[i].state.id;
+                copybook[pos++] = text.length;
+                copybook.set(text, pos);
+                pos += MAX_CLIENT_FIELD;
+            }
+            socket.send(buffer);
          }
          
          function add_key_event_listeners(key, event, callback) {
@@ -430,8 +440,6 @@
                     INPUTS[idx].focus();
             }
         }
-
-
 
           const stateBufferLength = 120; // this should be probably set in the message.
           const stateHeaderLength = 8;
@@ -526,7 +534,6 @@
              const scr_reserved     = view.getUint32(12, true); // BEWARE ENDIANESS
              const layoutBase       = headerSize;
              const stateBase        = layoutBase + layoutBytesSz;
-
              const layout_struct    = 8;
              const state_struct     = stateBufferLength + stateHeaderLength;
              const IC               = -1; /* Initial cursor flag */
@@ -572,6 +579,9 @@
                  handle.state.fgColor = fgColor || screenDefFgColor;
                  handle.state.bgColor = bgColor || screenDefBgColor;
                  handle.state.len = textLen;
+                 handle.state.r1 = stateR1;
+                 
+                 handle.toggleAttribute('data-num', handle.state.r1 & FLAGS_H.NUMERIC);  
                  
                  if (handle.state.flags & DSP.PASSWORD) { handle.type = "password"};                 
 		         handle.value = decoder.decode(textBytes);                 
@@ -627,6 +637,13 @@
 
         function keydown_actions(e) {
             const el = this;
+
+            if (el.dataset.num !== undefined
+                && e.key.length === 1 && !e.ctrlKey && !e.metaKey
+                && !/[0-9]/.test(e.key)) {
+                e.preventDefault();
+                return;
+            }
 
             /* printable key, field FULL → focus next; key lands there natively */
             if (e.key.length === 1 && !e.ctrlKey && !e.metaKey

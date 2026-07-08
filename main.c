@@ -39,6 +39,9 @@ enum colors def_bg_color_global = BLACK;
 #define INPUT(id, yy, xx, ww)                           \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, 0,0,0)
 
+#define INPUT_NUM(id, yy, xx, ww)                           \
+    X(id, VIS_INPUT, xx, yy, ww, "", 0, 0, 0, NUMERIC,0,0)
+
 #define INPUT_F(id, yy, xx, ww,flg)                     \
     X(id, VIS_INPUT, xx, yy, ww, "", 0, flg, 0, 0,0,0)
 
@@ -132,14 +135,14 @@ enum colors def_bg_color_global = BLACK;
 
 #define PW_ 29
 #define PHONE(SCR, row,col)                                             \
-    LABEL(SCR##_PHONE_LAB, row, col,27, "PHONE  . . . . . . . . . . ") \
-    LABEL(SCR##_PHONE_CC, row, col + PW_ ,2,"+1")                    \
-    LABEL(SCR##_PHONE_LF_P, row, col + PW_ + 2,1,"(")                \
-    INPUT(SCR##_PHONE_AREA_CODE,row,col + PW_ + 3,3)                 \
-    LABEL(SCR##_PHONE_RP, row,col+PW_+6, 1,")")                     \
-    INPUT(SCR##_PHONE_EX_CODE, row,col+ PW_ + 7,3)                   \
-    LABEL(SCR##_PHONE_DASH,row,col+PW_ + 10,1,"-")                   \
-    INPUT(SCR##_PHONE_SUBS_NUM,row,col+PW_+ 11,4)                   \
+    LABEL(SCR##_PHONE_LAB, row, col,27, "PHONE  . . . . . . . . . . ")  \
+    LABEL(SCR##_PHONE_CC, row, col + PW_ ,2,"+1")                       \
+    LABEL(SCR##_PHONE_LF_P, row, col + PW_ + 2,1,"(")                   \
+    INPUT_NUM(SCR##_PHONE_AREA_CODE,row,col + PW_ + 3,3)                \
+    LABEL(SCR##_PHONE_RP, row,col+PW_+6, 1,")")                         \
+    INPUT_NUM(SCR##_PHONE_EX_CODE, row,col+ PW_ + 7,3)                  \
+    LABEL(SCR##_PHONE_DASH,row,col+PW_ + 10,1,"-")                      \
+    INPUT_NUM(SCR##_PHONE_SUBS_NUM,row,col+PW_+ 11,4)                   \
     LABEL(SCR##_PHONE_blanks,row,col+PW_ + 15,8,"")     
 
 

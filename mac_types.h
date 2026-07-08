@@ -129,7 +129,7 @@ enum DSP {
 
 enum FLAGS_H {
     CLICKABLE = 1 << 0,
-    NUMERIC = 1 << 1,
+    NUMERIC =  1 << 1,
 };
 
 
@@ -200,11 +200,13 @@ struct __attribute__((packed)) cfh {
     u8 nFields;
 };
 
+
+#define MAX_CLIENT_FIELD 128
 /* client req field block field item */
 struct __attribute__((packed)) cfb {
     u8 id; //field_id
     u8 len;
-    char val[24]; 
+    char val[MAX_CLIENT_FIELD]; 
 };
 
 struct login_attempt {
