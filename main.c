@@ -120,7 +120,7 @@ enum colors def_bg_color_global = BLACK;
     LABEL(SCR##_SCREEN_FLD_TIME,1,64,16, "")
 
 #define WARNING_LINE(SCR,row)                    \
-    STATUS(SCR##_WARNING ,row, 38, 42, "", HIDDEN)              
+    STATUS(SCR##_WARNING ,row, 30, 42, "", HIDDEN)              
 
 #define MENU_ITEM(SCR,item_num, row, txt )             \
     LABEL(SCR##_MENU_ITEM_##item_num, row,10,sizeof(txt)-1 + 4, #item_num". " txt) 
@@ -161,18 +161,16 @@ enum colors def_bg_color_global = BLACK;
 #define FKEY_HL_LEN 79
 
 #define FKEY_BAR_1(SCR, k1)                                         \
-    HL(SCR##_HLA, 27, FKEY_X0, FKEY_HL_LEN)                               \
-    LABEL_FC(SCR##_F1, 28, FKEY_X0, sizeof(k1)-1, k1, FAINT, CYAN)  \
-    HL(SCR##_HLB, 29, FKEY_X0, FKEY_HL_LEN)
+    LABEL_FC(SCR##_F1, 27, FKEY_X0, sizeof(k1)-1, k1, FAINT, CYAN)  \
+    HL(SCR##_HLB, 28, FKEY_X0, FKEY_HL_LEN)
     
     
 #define FKEY_BAR_2(SCR, k1, k2)                                 \
-    HL(SCR##_HLA, 27, FKEY_X0, FKEY_HL_LEN)                                    \
-    LABEL_FC(SCR##_F1, 28, FKEY_X0,                             \
+    LABEL_FC(SCR##_F1, 27, FKEY_X0,                             \
     sizeof(k1)-1, k1, FAINT, CYAN)                              \
-    LABEL_FC(SCR##_F2, 28, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
+    LABEL_FC(SCR##_F2, 27, FKEY_X0 + (sizeof(k1)-1) + FKEY_GAP, \
     sizeof(k2)-1, k2, FAINT, CYAN)                              \
-    HL(SCR##_HLB, 29, FKEY_X0, FKEY_HL_LEN)
+    HL(SCR##_HLB, 28, FKEY_X0, FKEY_HL_LEN)
 
 #define FKEY_BAR_3(SCR, k1, k2, k3)                             \
     HL(SCR##_HLA, 26, FKEY_X0, FKEY_HL_LEN)                                     \
@@ -242,9 +240,9 @@ screen_renderer screen_renderers[] ={
     FORM_FIELD(LOGIN, IUSER,9,  "USER . . . . . . . . . . .")   \
     FORM_FIELD_S(LOGIN, IPW,11, "PASSWORD . . . . . . . . .")   \
     TAB_HINT(LOGIN)                                             \
-    WARNING_LINE(LOGIN,12)                                      \
+    WARNING_LINE(LOGIN,15)                                     \
     BOX(LOGIN ,login_form, 6, 5, 60, 7)                         \
-    BOX(LOGIN ,login_form2, 7, 7, 56, 5)                        \
+    BOX(LOGIN ,login_form2, 7, 7, 56, 5)                        
 
 
 
@@ -261,11 +259,12 @@ screen_renderer screen_renderers[] ={
     TITLE_BAR (ANC, "Marina 59 | Add new customer")                 \
     TAB_HINT(ANC)                                                   \
     FORM_FIELD(ANC, FIRST,  8, "FIRST  . . . . . . . . . . . " )    \
-    FORM_FIELD(ANC, LAST,  10, "LAST   . . . . . . . . . . . " )     \
+    FORM_FIELD(ANC, LAST,  10, "LAST   . . . . . . . . . . . " )    \
     FORM_FIELD(ANC, EMAIL, 12, "EMAIL  . . . . . . . . . . . " )    \
     WARNING_LINE(ANC, 18)                                           \
     FKEY_BAR_2(ANC, "F2=Logout", "F8=Back to Main Menu")            \
-    PHONE(ANC, 14, 9)
+    PHONE(ANC, 14, 9)                                               \
+    BOX(ANC ,ANC_form, 6, 5, 61, 10)                           
 
 
 /* #define MAIN_SCREEN_ALPHA                               \ */
@@ -1465,7 +1464,6 @@ const u8 screen_router[][32] = {
         [H_ANC_SCR_LOGOUT] = SCRID_LOGIN_SCREEN,
         [H_ANC_SCR_MAIN] = SCRID_MAIN_SCREEN
     }
-    
 };
 
 /* Dispatch Busines Logic */
@@ -1473,6 +1471,22 @@ void dispatch_business_logic(struct player *player, u8 *reqbuf, int reqbuflen) {
     
     (void) reqbuflen;
     u32 nxt_screen, handler_res;
+
+    // ls *.c *.h | entr -r sh -c 'make macabee-debug CFLAGS+=-DDEV_SCREEN=SCRID_ANC_SCREEN && ./macabee-debug'
+    /* USED DURING DEV ONLY */
+
+    
+    #ifdef DEV_SCREEN
+    if (player->scrid == SCRID_NO_SCREEN) {          /* first message only:      */
+        player->auth.id   = 10;                      /* dev player, pre-authed   */
+        //        player->auth.role = ROLE_ADMIN;
+        set_live_screen(player, DEV_SCREEN);
+        if (screen_renderers[player->scrid])
+            screen_renderers[player->scrid](player);
+        mb_send(player);
+        return;                                      /* hello consumed; done     */
+    }
+#endif
 
     /* array of handler functions */
     handler_res = screen_handlers[player->scrid](player, reqbuf);
@@ -1523,12 +1537,15 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
                 break;
             }
             c->fn_data = p;
+            mg_ws_send(c, "", 0, WEBSOCKET_OP_PING);
         } break;
 
         
     case MG_EV_WS_MSG:
         {
+
             struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
+            printf("WS_MSG flags=0x%02x len=%d\n", wm->flags, (int)wm->data.len);
             if ((wm->flags & 0x0f) == WEBSOCKET_OP_BINARY) {
                 struct player *p = c->fn_data;
                 if(!p) break;
@@ -1537,6 +1554,16 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
             }
         } break;
 
+    case MG_EV_WS_CTL: {
+        struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
+        if ((wm->flags & 0x0f) == WEBSOCKET_OP_PONG) {
+            struct player *p = c->fn_data;
+            if (p) p->last_seen = time(NULL);
+        }
+        /* CLOSE frames (0x88) also arrive here — deliberately ignored:
+           Mongoose runs the close handshake; our teardown fires at MG_EV_CLOSE. */
+    } break;
+        
     case MG_EV_CLOSE:
         {
             struct player *p = c->fn_data;
@@ -1549,10 +1576,32 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     }
 }
 
+#define PING_INTERVAL_MS  30000
+#define SESSION_TIMEOUT_S 90
+
+static void timer_fn(void *arg) {
+    struct mg_mgr *mgr = (struct mg_mgr *) arg;
+    time_t now = time(NULL);
+
+    for (struct mg_connection *c = mgr->conns; c != NULL; c = c->next) {
+        if (!c->is_websocket) continue;          /* skip listener/http */
+        struct player *p = c->fn_data;
+        if (!p) continue;
+
+        if (now - p->last_seen > SESSION_TIMEOUT_S) {
+            c->is_closing = 1;                   /* wedged → Mongoose closes →
+                                                    MG_EV_CLOSE → session_end */
+            continue;
+        }
+        mg_ws_send(c, "", 0, WEBSOCKET_OP_PING);
+    }
+}
+
 void clear_screen(void) {
     printf("\033[2J\033[H");
     fflush(stdout);
 }
+
 
 
 void stdin_read_password(char *buf, size_t size)
@@ -1782,6 +1831,8 @@ int main(void) {
             
     struct mg_mgr mgr;
     mg_mgr_init(&mgr);
+    
+    mg_timer_add(&mgr, PING_INTERVAL_MS, MG_TIMER_REPEAT, timer_fn, &mgr);
     mg_http_listen(&mgr, "http://0.0.0.0:8001", ev_handler, NULL);
 
     //    time_t last_tick = time(NULL);

@@ -169,6 +169,7 @@
         const ROW_H = 1.2;
         const url = "ws://localhost:8001/ws"
 
+
         window.addEventListener('resize', fitTerminal);
         fitTerminal();                                            
          
@@ -217,11 +218,21 @@
 	         terminal.appendChild(input);
 	         SLOT_POOL[i] = input;
          }
-         
-//         let socket = sys_net_init(url);
-         disableTabDefaults();
-         add_AID_keys();
 
+        const OIA_SLOT = MAX_SLOTS - 1;
+        const OIA = SLOT_POOL[OIA_SLOT];
+        OIA.readOnly = true;
+        OIA.disabled = false;
+        OIA.style.setProperty('--row', 30);
+        OIA.style.setProperty('--col', 0);
+        OIA.style.setProperty('--width', 80);
+        OIA.setAttribute('data-fg', 1);
+        OIA.toggleAttribute('data-faint', true);
+        OIA.toggleAttribute('data-hidden', false);
+         
+        disableTabDefaults();
+        add_AID_keys();
+        let socket = sys_net_init(url);        
 
          const AID_KEYS = Object.freeze ({
              'Enter': 0xFF,
@@ -240,33 +251,6 @@
              NEW:    0x01,
              UPDATE: 0x02
          });
-
-          // THESE VALUES ARE ONLY USED FOR SETTING
-          // SCREEN DEFAULTS
-        //  const COLORS = Object.freeze ({
-        //      BLACK:   '#000000',
-        //      RED:    '#aa0000',
-        //      GREEN:   '#00aa00',
-        //      BROWN:   '#aa5500',
-        //      BLUE:    '#0000aa',
-        //      MAGENTA: '#ff00ff',
-        //      CYAN:    '#55ffff',
-        //      WHITE:   '#ffffff',
-        //      AMBER:   '#ffac00'
-        //  });
-
-        // const COLOR_WHEEL = [
-        //     null,
-        //     '#aa0000',  
-        //     '#00aa00', 
-        //     '#aa5500', 
-        //     '#0000aa', 
-        //     '#ff00ff', 
-        //     '#55ffff', 
-        //     '#ffffff', 
-        //     '#ffac00',
-        //     '#000000'
-        // ];
 
         
           // These are indexes into the data-registers above.
@@ -324,6 +308,7 @@
          function globalReset() {
              INPUTS.length = 0;
              for (let i = 0; i < MAX_SLOTS; i++) {
+                 if (i === OIA_SLOT) continue;
                  const handle = SLOT_POOL[i];
                  handle.isDirty = false;
                  handle.disabled = true;
@@ -445,14 +430,17 @@
           const stateHeaderLength = 8;
         
         function sys_update_terminal(view) {
+            
             const decoder          = new TextDecoder('utf-8');
             const headerSize       = 16;
-            const opcodeB          = view.getUint8(SPH.opcodeB);
+            const opcodeB          = view.getUint8(1);
             const fieldCount       = view.getUint8(2);
             const reserved         = view.getUint8(3);
             const layoutBytesSz    = view.getUint16(4,true); 
             const stateBytesSz     = view.getUint16(6,true);
             const stateBase        = headerSize;
+
+
             const state_struct     = stateBufferLength + stateHeaderLength;
             const IC               = reserved; /* Initial cursor flag */
             for (let i             = 0; i < fieldCount; i++) {
@@ -466,7 +454,8 @@
                 const stateR1   = view.getUint8(stateOffset + 5);
                 const stateR2   = view.getUint8(stateOffset + 6);
                 const stateR3   = view.getUint8(stateOffset + 7);
-                //
+
+                
                 const textBytes = new Uint8Array(view.buffer, stateOffset + 8, textLen);
 
                 const handle = SLOT_POOL[stateId];
@@ -723,6 +712,8 @@
 	        s.onopen = ()  => {
                 retryMs = 300;
 		        console.log  ("Network pipeline connected to C backend.");
+                OIA.value = '';
+                OIA.toggleAttribute('data-blink', false);
 		        socket.send(Uint8Array.of(0x88));
 	        };
             
@@ -730,11 +721,13 @@
                 console.log  ("Disconnected - retry in", retryMs);
                 setTimeout(() => { socket = sys_net_init(url); }, retryMs);
                 retryMs = Math.min(retryMs * 2, 5000);
+                OIA.value = 'X SYSTEM — CONNECTION LOST, RETRYING';
+                OIA.toggleAttribute('data-blink', true);
             };
             s.onerror = (err) => console.error("Network socket error:", err);
 	        return s;
         }
-         let socket = sys_net_init(url);        
+//         let socket = sys_net_init(url);        
         </script>
     </body>
 </html>
