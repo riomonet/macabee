@@ -511,11 +511,18 @@ void init_screen_renderers() {
 
 /* ------------------------------------------------------------------------ */
 
+
+
+
+
 struct net_payload_screen {
     int id;
     u8 *buf;
     size_t len;
 };
+
+
+
 
 struct net_payload_screen serialize_screen(struct field_state *fs, struct field_layout *fl, int num_fields, u8 opA, u8 opB, u8 ic, u8 *buf) {
     int is_new = 0;
@@ -562,7 +569,6 @@ struct net_payload_screen serialize_screen(struct field_state *fs, struct field_
 }
 
 
-
 /* ---------------------------- World state management ------------------------------------ */
 
 /* 'players' is a pointer to a global hash table.  It is 
@@ -597,10 +603,39 @@ struct player *onboard_new_player(struct mg_connection *c) {
     return player;
 }
 
+/* /\* Wrapper around mg_ws_send *\/ */
+/* void mb_send (struct player *player) { */
+/*     u8 buffer[4096]; */
+    
+/*     struct live_screen *scr = &player->scr; */
+/*     struct net_payload_screen payload = serialize_screen(scr->state, */
+/*                                                          scr->layout, */
+/*                                                          scr->nFields, */
+/*                                                          scr->op_A, */
+/*                                                          scr->op_B, */
+/*                                                          scr->ic, */
+/*                                                          buffer */
+/*                                                          ); */
+
+/*     mg_ws_send(player->c, payload.buf, payload.len, WEBSOCKET_OP_BINARY); */
+/* } */
+
+
+
+
+
+
+/* ----------------------------- Render functions ------------------------------------------------------------------- */
+
+struct field_state field_copy(struct field_state old)  {
+    struct field_state new = old;
+    return new;
+}
+
 /* Wrapper around mg_ws_send */
 void mb_send (struct player *player) {
     u8 buffer[4096];
-
+    
     struct live_screen *scr = &player->scr;
     struct net_payload_screen payload = serialize_screen(scr->state,
                                                          scr->layout,
@@ -614,24 +649,18 @@ void mb_send (struct player *player) {
     mg_ws_send(player->c, payload.buf, payload.len, WEBSOCKET_OP_BINARY);
 }
 
-/* ----------------------------- Render functions ------------------------------------------------------------------- */
-
-struct field_state field_copy(struct field_state old)  {
-    struct field_state new = old;
-    return new;
-}
-
 /* Pass an array of field_states to be sent to client player */
 void mb_send_update(struct player *player, int nFields, struct field_state *buf, int ic) {
     player->scr.op_A = OP_A_UPDATE; 
     player->scr.op_B = OP_B_DEF;
     player->scr.ic = ic;
     player->scr.nFields = nFields;
-
+    
     int len = nFields * sizeof(struct field_state);
     memcpy(player->scr.state,buf, len);
     mb_send(player);
 }
+
 
 /* TODO: Make this more general, it should take a column color and text */
 void render_login_warning(struct player *player, char *txt) {

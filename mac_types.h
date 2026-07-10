@@ -94,6 +94,11 @@ struct __attribute__((packed)) field_state {
     char text[MAX_FLD_SIZE];
 };
 
+struct __attribute__((packed)) fields {
+    struct field_layout l;
+    struct field_state s;
+};
+
 
 enum permissions {
     ADMIN, CUSTOMER
@@ -153,16 +158,18 @@ struct screen {
     struct field_state *state;
 };
 
-
+#define MAX_SCR_FIELDS 100
 /* live screen is the actual transmit screen */
 struct live_screen {
     u8 op_A;
     u8 op_B;
     u8 ic;
     size_t nFields;
-    struct field_layout layout[100];
-    struct field_state state[100];
+    struct field_layout layout[MAX_SCR_FIELDS];
+    struct field_state state[MAX_SCR_FIELDS];
 };
+
+
 
 
 /* Role values must be explictly defined or db values will no align. */
@@ -180,6 +187,7 @@ struct player {
     UT_hash_handle hh;
     u8 scrid;
     u8 scrat;
+    u8 dirty_side_car[MAX_SCR_FIELDS];
     struct live_screen scr;
     struct auth {
         time_t logintim;
