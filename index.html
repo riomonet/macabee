@@ -1,6 +1,9 @@
 <!DOCTYPE html>
+
 <html>
-    <head>
+  <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
         <style>
 
           
@@ -16,11 +19,13 @@
          }
 
          #terminal {
-             --cell-h: 24px; 
+             --cell-h: 26px; 
              --cell-w: 1ch;
              --line-hvy: calc(var(--cell-h) * .33); /*TODO: can send this scale factor on the wire.*/
              position: relative;           /* slots now anchor to the panel */
-             font-family: monospace;
+             font-family: 'IBM Plex Mono', monospace;
+
+             /* font-family: monospace; */
              flex-shrink: 0;
              font-size: 20px;             
              width:  calc(80 * var(--cell-w));             /* Width of each col.  */
@@ -166,7 +171,7 @@
         const INPUTS  = [];
         const SLOT_POOL = new Array(MAX_SLOTS);
         const terminal = document.getElementById('terminal');
-        const ROW_H = 1.2;
+        const ROW_H = 1.3;
         const url = "ws://localhost:8001/ws"
 
 
